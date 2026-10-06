@@ -1,5 +1,5 @@
 // UI 渲染模块
-import { supabase } from './supabase-config.js';
+import { getSupabaseClient } from './supabase-config.js';
 import { getUserRole, logout, getCurrentUser } from './auth.js';
 import { getAllTasks, createTask, updateTask, deleteTask } from './task-api.js';
 import { getUserCheckins, getAllUserCheckins, toggleCheckin, isChecked } from './checkin-api.js';
@@ -129,10 +129,115 @@ async function createTaskElement(task, role) {
 async function editTask(task) {
   console.log('编辑任务:', task);
   try {
-    // 打开编辑页面，传递任务ID
-    const editUrl = `edit-task.html?id=${task.id}`;
-    console.log('跳转到编辑页面:', editUrl);
-    window.location.href = editUrl;
+    // 在当前页面显示编辑表单
+    const taskForm = document.getElementById('task-form');
+    
+    if (!taskForm) {
+      console.error('找不到任务表单容器');
+      return;
+    }
+    
+    // 添加编辑模式样式
+    taskForm.classList.add('edit-mode');
+    
+    // 填充表单数据
+    taskForm.innerHTML = `
+      <h2>编辑任务</h2>
+      <form id="edit-task-form">
+        <input type="hidden" id="edit-task-id" value="${task.id}">
+        <div class="form-group">
+          <label for="edit-task-title">任务标题 *</label>
+          <input type="text" id="edit-task-title" value="${task.title}" required>
+        </div>
+        
+        <div class="form-group">
+          <label for="edit-task-subject">任务主题</label>
+          <input type="text" id="edit-task-subject" value="${task.subject || ''}">
+        </div>
+        
+        <div class="form-group">
+          <label for="edit-task-description">任务描述</label>
+          <textarea id="edit-task-description">${task.description || ''}</textarea>
+        </div>
+        
+        <div class="form-group">
+          <label for="edit-task-due-date">截止日期</label>
+          <input type="date" id="edit-task-due-date" value="${task.due_date ? new Date(task.due_date).toISOString().split('T')[0] : ''}">
+        </div>
+        
+        <div class="form-group">
+          <label for="edit-task-priority">优先级</label>
+          <select id="edit-task-priority">
+            <option value="low" ${task.priority === 'low' ? 'selected' : ''}>低</option>
+            <option value="normal" ${task.priority === 'normal' ? 'selected' : ''}>中</option>
+            <option value="high" ${task.priority === 'high' ? 'selected' : ''}>高</option>
+          </select>
+        </div>
+        
+        <div class="form-actions">
+          <button type="submit" class="submit-btn">保存修改</button>
+          <button type="button" class="btn cancel-edit">取消</button>
+        </div>
+      </form>
+    `;
+    
+    // 添加表单提交事件
+    const form = document.getElementById('edit-task-form');
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const taskId = document.getElementById('edit-task-id').value;
+        const title = document.getElementById('edit-task-title').value.trim();
+        const subject = document.getElementById('edit-task-subject').value.trim();
+        const description = document.getElementById('edit-task-description').value.trim();
+        const dueDate = document.getElementById('edit-task-due-date').value;
+        const priority = document.getElementById('edit-task-priority').value;
+        
+        if (!title) {
+          showNotification('请输入任务标题', 'error');
+          return;
+        }
+        
+        try {
+          const { success, error } = await updateTask(taskId, {
+            title,
+            subject,
+            description,
+            due_date: dueDate ? new Date(dueDate).toISOString() : null,
+            priority
+          });
+          
+          if (success) {
+            showNotification('任务更新成功！', 'success');
+            // 重新渲染任务列表和表单
+            await renderTaskList();
+            renderAdminTaskForm(); // 重新渲染创建任务表单
+          } else {
+            throw new Error(error);
+          }
+        } catch (error) {
+          showNotification(`更新任务失败: ${error.message}`, 'error');
+        }
+      });
+      
+      // 添加取消按钮事件
+      const cancelBtn = form.querySelector('.cancel-edit');
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+          // 移除编辑模式样式并重新渲染创建任务表单
+          const taskForm = document.getElementById('task-form');
+          if (taskForm) {
+            taskForm.classList.remove('edit-mode');
+            renderAdminTaskForm();
+          }
+        });
+      }
+      
+      console.log('编辑表单事件监听器已添加');
+    } else {
+      console.error('找不到编辑表单');
+    }
   } catch (error) {
     console.error('编辑任务失败:', error);
     showNotification(`编辑任务失败: ${error.message}`, 'error');
@@ -182,6 +287,9 @@ export function renderAdminTaskForm() {
 
   if (!taskForm) return;
 
+  // 移除编辑模式样式
+  taskForm.classList.remove('edit-mode');
+  
   taskForm.innerHTML = `
     <h2>创建新任务</h2>
     <form id="new-task-form">
@@ -402,6 +510,21 @@ export async function initPage() {
       console.log('退出登录按钮事件监听器已添加');
     } else {
       console.error('找不到退出登录按钮');
+    }
+    
+    // 检查URL参数是否包含编辑模式
+    const urlParams = new URLSearchParams(window.location.search);
+    const taskId = urlParams.get('id');
+    if (taskId) {
+      // 获取任务数据并进入编辑模式
+      const { success, data, error } = await getAllTasks();
+      if (success) {
+        const task = data.find(t => t.id == taskId);
+        if (task) {
+          console.log('进入编辑模式，任务ID:', taskId);
+          editTask(task);
+        }
+      }
     }
   } catch (error) {
     console.error('页面初始化失败:', error);

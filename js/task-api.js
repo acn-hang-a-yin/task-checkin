@@ -1,10 +1,11 @@
 // 任务API模块
-import { supabase } from './supabase-config.js';
+import { getSupabaseClient } from './supabase-config.js';
 import { isAdmin } from './auth.js';
 
 // 获取所有任务
 export async function getAllTasks() {
   try {
+    const supabase = await getSupabaseClient();
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
@@ -29,6 +30,7 @@ export async function createTask(taskData) {
       throw new Error('权限不足：只有管理员可以新增任务');
     }
     
+    const supabase = await getSupabaseClient();
     const { data, error } = await supabase
       .from('tasks')
       .insert([taskData])
@@ -53,6 +55,7 @@ export async function updateTask(taskId, taskData) {
       throw new Error('权限不足：只有管理员可以编辑任务');
     }
     
+    const supabase = await getSupabaseClient();
     // 确保updated_at字段被更新
     const updateData = { ...taskData, updated_at: new Date() };
     
@@ -81,6 +84,7 @@ export async function deleteTask(taskId) {
       throw new Error('权限不足：只有管理员可以删除任务');
     }
     
+    const supabase = await getSupabaseClient();
     const { error } = await supabase
       .from('tasks')
       .delete()

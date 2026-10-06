@@ -1,5 +1,5 @@
 // 打卡API模块
-import { supabase } from './supabase-config.js';
+import { getSupabaseClient } from './supabase-config.js';
 import { getCurrentUser, isAdmin } from './auth.js';
 
 // 获取用户的打卡记录
@@ -11,6 +11,7 @@ export async function getUserCheckins() {
       throw new Error('用户未登录');
     }
 
+    const supabase = await getSupabaseClient();
     const { data, error } = await supabase
       .from('task_checkins')
       .select(`
@@ -42,6 +43,7 @@ export async function getAllUserCheckins() {
       throw new Error('权限不足：只有管理员可以查看所有用户的打卡记录');
     }
 
+    const supabase = await getSupabaseClient();
     const { data, error } = await supabase
       .from('task_checkins')
       .select(`
@@ -73,6 +75,7 @@ export async function toggleCheckin(taskId) {
       throw new Error('用户未登录');
     }
 
+    const supabase = await getSupabaseClient();
     // 检查是否已存在打卡记录
     const { data: existingCheckin, error: checkError } = await supabase
       .from('task_checkins')
@@ -134,6 +137,7 @@ export async function isChecked(taskId) {
       return false;
     }
 
+    const supabase = await getSupabaseClient();
     const { data, error } = await supabase
       .from('task_checkins')
       .select('is_checked')

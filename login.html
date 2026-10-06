@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>任务打卡系统 - 登录</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✅</text></svg>">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -32,6 +33,31 @@
         const loginForm = document.getElementById('login-form');
         const loginError = document.getElementById('login-error');
 
+        // 添加重试机制
+        async function loginWithRetry(email, password, maxRetries = 3) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const { success, error, user } = await login(email, password);
+                    
+                    if (success) {
+                        return { success: true, user };
+                    }
+                    
+                    // 如果是最后一次尝试或者不是网络错误，直接返回
+                    if (i === maxRetries - 1 || !error?.message?.includes('network')) {
+                        throw new Error(error);
+                    }
+                    
+                    // 等待一段时间后重试
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                } catch (error) {
+                    if (i === maxRetries - 1) {
+                        throw new Error(`登录失败: ${error.message}（已重试${maxRetries}次）`);
+                    }
+                }
+            }
+        }
+
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
@@ -41,7 +67,7 @@
             loginError.textContent = '';
             
             try {
-                const { success, error, user } = await login(email, password);
+                const { success, error, user } = await loginWithRetry(email, password);
                 
                 if (!success) {
                     throw new Error(error);

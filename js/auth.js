@@ -1,9 +1,10 @@
 // 用户认证模块
-import { supabase } from './supabase-config.js';
+import { getSupabaseClient } from './supabase-config.js';
 
 // 登录函数
 export async function login(email, password) {
   try {
+    const supabase = await getSupabaseClient();
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -22,6 +23,7 @@ export async function login(email, password) {
 // 退出登录
 export async function logout() {
   try {
+    const supabase = await getSupabaseClient();
     const { error } = await supabase.auth.signOut();
 
     if (error) {
@@ -37,6 +39,7 @@ export async function logout() {
 // 获取当前用户
 export async function getCurrentUser() {
   try {
+    const supabase = await getSupabaseClient();
     const { data: { user }, error } = await supabase.auth.getUser();
 
     if (error) {

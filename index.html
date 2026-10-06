@@ -40,7 +40,14 @@
         import { initPage } from './js/ui.js';
         
         // 初始化页面
-        initPage();
+        console.log('开始初始化页面');
+        try {
+            initPage();
+            console.log('页面初始化完成');
+        } catch (error) {
+            console.error('页面初始化失败:', error);
+            alert('页面初始化失败，请刷新页面重试');
+        }
     </script>
 </body>
 </html>

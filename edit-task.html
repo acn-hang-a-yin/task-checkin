@@ -51,7 +51,6 @@
             
             <div class="form-actions">
                 <button id="save-btn" class="submit-btn">保存修改</button>
-                <button id="cancel-btn" class="btn">取消</button>
             </div>
         </div>
     </main>
@@ -61,19 +60,32 @@
         import { showNotification } from './js/ui.js';
         import { updateTask } from './js/task-api.js';
         
+        console.log('编辑页面脚本开始加载');
+        
         // 获取URL参数中的任务ID
         const urlParams = new URLSearchParams(window.location.search);
         const taskId = urlParams.get('id');
         
+        console.log('URL参数:', Object.fromEntries(urlParams));
+        console.log('任务ID:', taskId);
+        
         if (!taskId) {
+            console.error('无效的任务ID');
             showNotification('无效的任务ID', 'error');
-            window.location.href = 'index.html';
-            return;
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1500);
         }
         
         // 加载任务数据
         async function loadTaskData() {
+            console.log('开始加载任务数据，任务ID:', taskId);
+            
+            // 显示加载状态
+            setLoadingState(true);
+            
             try {
+                console.log('正在从数据库获取任务数据...');
                 const { data, error } = await supabase
                     .from('tasks')
                     .select('*')
@@ -84,16 +96,49 @@
                     throw new Error(error.message);
                 }
                 
+                console.log('获取到的任务数据:', data);
+                
                 // 填充表单数据
-                document.getElementById('edit-title').value = data.title;
-                document.getElementById('edit-subject').value = data.subject || '';
-                document.getElementById('edit-description').value = data.description || '';
-                document.getElementById('edit-due-date').value = data.due_date ? new Date(data.due_date).toISOString().split('T')[0] : '';
-                document.getElementById('edit-priority').value = data.priority;
+                const titleInput = document.getElementById('edit-title');
+                const subjectInput = document.getElementById('edit-subject');
+                const descriptionInput = document.getElementById('edit-description');
+                const dueDateInput = document.getElementById('edit-due-date');
+                const priorityInput = document.getElementById('edit-priority');
+                
+                if (titleInput) {
+                    titleInput.value = data.title || '';
+                    console.log('任务标题已填充:', data.title);
+                }
+                if (subjectInput) {
+                    subjectInput.value = data.subject || '';
+                    console.log('任务主题已填充:', data.subject);
+                }
+                if (descriptionInput) {
+                    descriptionInput.value = data.description || '';
+                    console.log('任务描述已填充:', data.description);
+                }
+                if (dueDateInput) {
+                    dueDateInput.value = data.due_date ? new Date(data.due_date).toISOString().split('T')[0] : '';
+                    console.log('截止日期已填充:', data.due_date);
+                }
+                if (priorityInput) {
+                    priorityInput.value = data.priority || 'normal';
+                    console.log('优先级已填充:', data.priority);
+                }
+                
+                console.log('表单数据填充完成');
+                showNotification('任务数据加载成功', 'success');
                 
             } catch (error) {
+                console.error('加载任务数据失败:', error);
                 showNotification(`加载任务数据失败: ${error.message}`, 'error');
-                window.location.href = 'index.html';
+                // 延迟后返回主页面
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 2000);
+            } finally {
+                // 恢复按钮状态
+                setLoadingState(false);
             }
         }
         
@@ -110,7 +155,13 @@
                 return;
             }
             
+            // 显示加载状态
+            setLoadingState(true);
+            
             try {
+                console.log('开始保存任务，任务ID:', taskId);
+                console.log('保存的数据:', { title, subject, description, dueDate, priority });
+                
                 const { success, error } = await updateTask(taskId, {
                     title,
                     subject,
@@ -130,27 +181,95 @@
                 }, 1500);
                 
             } catch (error) {
+                console.error('保存任务失败:', error);
                 showNotification(`更新任务失败: ${error.message}`, 'error');
+            } finally {
+                // 恢复按钮状态
+                setLoadingState(false);
             }
         }
         
-        // 取消编辑
-        function cancelEdit() {
-            window.location.href = 'index.html';
-        }
+        
         
         // 返回按钮
         function goBack() {
-            window.location.href = 'index.html';
+            console.log('返回按钮被点击');
+            try {
+                window.location.href = 'index.html';
+            } catch (error) {
+                console.error('返回失败:', error);
+                showNotification('返回失败，请重试', 'error');
+            }
+        }
+        
+        // 检查用户权限
+        async function checkUserPermission() {
+            try {
+                const { getUserRole } = await import('./js/auth.js');
+                const role = await getUserRole();
+                
+                if (!role) {
+                    showNotification('请先登录', 'error');
+                    window.location.href = 'login.html';
+                    return false;
+                }
+                
+                if (role !== 'admin') {
+                    showNotification('权限不足：只有管理员可以编辑任务', 'error');
+                    return false;
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('检查用户权限失败:', error);
+                showNotification('检查权限失败，请刷新页面重试', 'error');
+                return false;
+            }
+        }
+        
+        // 显示加载状态
+        function setLoadingState(isLoading) {
+            const saveBtn = document.getElementById('save-btn');
+            if (saveBtn) {
+                saveBtn.disabled = isLoading;
+                saveBtn.textContent = isLoading ? '保存中...' : '保存修改';
+            }
         }
         
         // 添加事件监听器
-        document.getElementById('save-btn').addEventListener('click', saveTask);
-        document.getElementById('cancel-btn').addEventListener('click', cancelEdit);
-        document.getElementById('back-btn').addEventListener('click', goBack);
-        
-        // 加载任务数据
-        loadTaskData();
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('DOM加载完成，开始添加事件监听器');
+            try {
+                const saveBtn = document.getElementById('save-btn');
+                const backBtn = document.getElementById('back-btn');
+                
+                if (saveBtn) {
+                    saveBtn.addEventListener('click', saveTask);
+                    console.log('保存按钮事件监听器已添加');
+                } else {
+                    console.error('找不到保存按钮');
+                }
+                
+                if (backBtn) {
+                    backBtn.addEventListener('click', goBack);
+                    console.log('返回按钮事件监听器已添加');
+                } else {
+                    console.error('找不到返回按钮');
+                }
+                
+                // 检查用户权限
+                const hasPermission = await checkUserPermission();
+                if (!hasPermission) {
+                    return;
+                }
+                
+                // 加载任务数据
+                await loadTaskData();
+            } catch (error) {
+                console.error('添加事件监听器失败:', error);
+                showNotification('页面初始化失败，请刷新页面重试', 'error');
+            }
+        });
     </script>
 </body>
 </html>

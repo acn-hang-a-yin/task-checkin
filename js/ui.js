@@ -93,10 +93,33 @@ async function createTaskElement(task, role) {
 
   // 添加事件监听器
   if (role === 'admin') {
-    taskElement.querySelector('.edit-task').addEventListener('click', () => editTask(task));
-    taskElement.querySelector('.delete-task').addEventListener('click', () => deleteTaskHandler(task));
+    const editBtn = taskElement.querySelector('.edit-task');
+    const deleteBtn = taskElement.querySelector('.delete-task');
+    
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        console.log('编辑按钮被点击，任务ID:', task.id);
+        editTask(task);
+      });
+      console.log('编辑按钮事件监听器已添加');
+    } else {
+      console.error('找不到编辑按钮');
+    }
+    
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => deleteTaskHandler(task));
+      console.log('删除按钮事件监听器已添加');
+    } else {
+      console.error('找不到删除按钮');
+    }
   } else {
-    taskElement.querySelector('.checkin-btn').addEventListener('click', () => toggleCheckinHandler(task));
+    const checkinBtn = taskElement.querySelector('.checkin-btn');
+    if (checkinBtn) {
+      checkinBtn.addEventListener('click', () => toggleCheckinHandler(task));
+      console.log('打卡按钮事件监听器已添加');
+    } else {
+      console.error('找不到打卡按钮');
+    }
   }
 
   return taskElement;
@@ -104,46 +127,50 @@ async function createTaskElement(task, role) {
 
 // 编辑任务
 async function editTask(task) {
-  // 打开编辑页面，传递任务ID
-  window.location.href = `edit-task.html?id=${task.id}`;
+  console.log('编辑任务:', task);
+  try {
+    // 打开编辑页面，传递任务ID
+    const editUrl = `edit-task.html?id=${task.id}`;
+    console.log('跳转到编辑页面:', editUrl);
+    window.location.href = editUrl;
+  } catch (error) {
+    console.error('编辑任务失败:', error);
+    showNotification(`编辑任务失败: ${error.message}`, 'error');
+  }
 }
 
 // 删除任务
 async function deleteTaskHandler(task) {
-  if (!confirm(`确定要删除任务 "${task.title}" 吗？`)) return;
+  if (!confirm(`确定要删除任务"${task.title}"吗？`)) {
+    return;
+  }
 
   try {
     const { success, error } = await deleteTask(task.id);
 
-    if (!success) {
+    if (success) {
+      showNotification('任务删除成功！', 'success');
+      await renderTaskList();
+    } else {
       throw new Error(error);
     }
-
-    showNotification('任务删除成功', 'success');
-    renderTaskList();
   } catch (error) {
     showNotification(`删除任务失败: ${error.message}`, 'error');
   }
 }
 
-// 打卡/取消打卡
+// 打卡处理
 async function toggleCheckinHandler(task) {
   try {
     const { success, error, action } = await toggleCheckin(task.id);
 
-    if (!success) {
+    if (success) {
+      const message = action === 'checked' ? '打卡成功！' : '取消打卡成功！';
+      showNotification(message, 'success');
+      await renderTaskList();
+    } else {
       throw new Error(error);
     }
-
-    // 重新渲染任务列表以同步按钮状态
-    await renderTaskList();
-
-    // 显示成功提示
-    showNotification(
-      action === 'checked' ? '打卡成功！' : '取消打卡成功！',
-      'success'
-    );
-
   } catch (error) {
     showNotification(`打卡操作失败: ${error.message}`, 'error');
   }
@@ -156,24 +183,28 @@ export function renderAdminTaskForm() {
   if (!taskForm) return;
 
   taskForm.innerHTML = `
-    <h2>新增任务</h2>
+    <h2>创建新任务</h2>
     <form id="new-task-form">
       <div class="form-group">
         <label for="task-title">任务标题 *</label>
         <input type="text" id="task-title" required>
       </div>
+      
       <div class="form-group">
         <label for="task-subject">任务主题</label>
         <input type="text" id="task-subject">
       </div>
+      
       <div class="form-group">
         <label for="task-description">任务描述</label>
-        <textarea id="task-description" rows="3"></textarea>
+        <textarea id="task-description"></textarea>
       </div>
+      
       <div class="form-group">
         <label for="task-due-date">截止日期</label>
         <input type="date" id="task-due-date">
       </div>
+      
       <div class="form-group">
         <label for="task-priority">优先级</label>
         <select id="task-priority">
@@ -182,40 +213,56 @@ export function renderAdminTaskForm() {
           <option value="high">高</option>
         </select>
       </div>
-      <button type="submit" class="btn submit-btn">创建任务</button>
+      
+      <div class="form-actions">
+        <button type="submit" class="submit-btn">创建任务</button>
+        <button type="reset" class="btn">重置</button>
+      </div>
     </form>
   `;
 
   // 添加表单提交事件
-  document.getElementById('new-task-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const title = document.getElementById('task-title').value;
-    const subject = document.getElementById('task-subject').value;
-    const description = document.getElementById('task-description').value;
-    const dueDate = document.getElementById('task-due-date').value;
-    const priority = document.getElementById('task-priority').value;
-
-    try {
-      const { success, error, data } = await createTask({
-        title,
-        subject: subject || null,
-        description: description || null,
-        due_date: dueDate ? new Date(dueDate).toISOString() : null,
-        priority
-      });
-
-      if (!success) {
-        throw new Error(error);
+  const form = document.getElementById('new-task-form');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const title = document.getElementById('task-title').value.trim();
+      const subject = document.getElementById('task-subject').value.trim();
+      const description = document.getElementById('task-description').value.trim();
+      const dueDate = document.getElementById('task-due-date').value;
+      const priority = document.getElementById('task-priority').value;
+      
+      if (!title) {
+        showNotification('请输入任务标题', 'error');
+        return;
       }
-
-      showNotification('任务创建成功', 'success');
-      renderTaskList();
-      e.target.reset();
-    } catch (error) {
-      showNotification(`创建任务失败: ${error.message}`, 'error');
-    }
-  });
+      
+      try {
+        const { success, error } = await createTask({
+          title,
+          subject,
+          description,
+          due_date: dueDate ? new Date(dueDate).toISOString() : null,
+          priority
+        });
+        
+        if (success) {
+          showNotification('任务创建成功！', 'success');
+          form.reset();
+          await renderTaskList();
+        } else {
+          throw new Error(error);
+        }
+      } catch (error) {
+        showNotification(`创建任务失败: ${error.message}`, 'error');
+      }
+    });
+    
+    console.log('管理员任务表单事件监听器已添加');
+  } else {
+    console.error('找不到新任务表单');
+  }
 }
 
 // 渲染管理员打卡统计
@@ -320,28 +367,46 @@ export async function renderPageByRole() {
 
 // 初始化页面
 export async function initPage() {
-  // 检查登录状态
-  const isLoggedIn = await checkAuth();
-
-  if (!isLoggedIn) {
-    // 未登录，重定向到登录页
-    window.location.href = 'login.html';
-    return;
-  }
-
-  // 渲染页面
-  await renderPageByRole();
-
-  // 添加退出登录事件
-  document.getElementById('logout-btn').addEventListener('click', async () => {
-    const { success, error } = await logout();
-
-    if (success) {
+  console.log('开始初始化页面');
+  try {
+    // 检查登录状态
+    console.log('检查登录状态...');
+    const isLoggedIn = await checkAuth();
+    console.log('登录状态:', isLoggedIn);
+    
+    if (!isLoggedIn) {
+      // 未登录，重定向到登录页
+      console.log('用户未登录，跳转到登录页');
       window.location.href = 'login.html';
-    } else {
-      showNotification(`退出登录失败: ${error}`, 'error');
+      return;
     }
-  });
+    
+    // 渲染页面
+    console.log('开始渲染页面...');
+    await renderPageByRole();
+    console.log('页面渲染完成');
+    
+    // 添加退出登录事件
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        console.log('退出登录按钮被点击');
+        const { success, error } = await logout();
+        
+        if (success) {
+          window.location.href = 'login.html';
+        } else {
+          showNotification(`退出登录失败: ${error}`, 'error');
+        }
+      });
+      console.log('退出登录按钮事件监听器已添加');
+    } else {
+      console.error('找不到退出登录按钮');
+    }
+  } catch (error) {
+    console.error('页面初始化失败:', error);
+    showNotification(`页面初始化失败: ${error.message}`, 'error');
+  }
 }
 
 // 检查登录状态

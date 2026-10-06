@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>编辑任务</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1>编辑任务</h1>
+            <nav class="nav">
+                <button id="back-btn" class="btn">返回</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="task-form" id="edit-task-form">
+            <h2>编辑任务</h2>
+            
+            <div class="form-group">
+                <label for="edit-title">任务标题 *</label>
+                <input type="text" id="edit-title" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="edit-subject">任务主题</label>
+                <input type="text" id="edit-subject">
+            </div>
+            
+            <div class="form-group">
+                <label for="edit-description">任务描述</label>
+                <textarea id="edit-description"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="edit-due-date">截止日期</label>
+                <input type="date" id="edit-due-date">
+            </div>
+            
+            <div class="form-group">
+                <label for="edit-priority">优先级</label>
+                <select id="edit-priority">
+                    <option value="low">低</option>
+                    <option value="normal">中</option>
+                    <option value="high">高</option>
+                </select>
+            </div>
+            
+            <div class="form-actions">
+                <button id="save-btn" class="submit-btn">保存修改</button>
+                <button id="cancel-btn" class="btn">取消</button>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { supabase } from './js/supabase-config.js';
+        import { showNotification } from './js/ui.js';
+        import { updateTask } from './js/task-api.js';
+        
+        // 获取URL参数中的任务ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const taskId = urlParams.get('id');
+        
+        if (!taskId) {
+            showNotification('无效的任务ID', 'error');
+            window.location.href = 'index.html';
+            return;
+        }
+        
+        // 加载任务数据
+        async function loadTaskData() {
+            try {
+                const { data, error } = await supabase
+                    .from('tasks')
+                    .select('*')
+                    .eq('id', taskId)
+                    .single();
+                
+                if (error) {
+                    throw new Error(error.message);
+                }
+                
+                // 填充表单数据
+                document.getElementById('edit-title').value = data.title;
+                document.getElementById('edit-subject').value = data.subject || '';
+                document.getElementById('edit-description').value = data.description || '';
+                document.getElementById('edit-due-date').value = data.due_date ? new Date(data.due_date).toISOString().split('T')[0] : '';
+                document.getElementById('edit-priority').value = data.priority;
+                
+            } catch (error) {
+                showNotification(`加载任务数据失败: ${error.message}`, 'error');
+                window.location.href = 'index.html';
+            }
+        }
+        
+        // 保存任务
+        async function saveTask() {
+            const title = document.getElementById('edit-title').value.trim();
+            const subject = document.getElementById('edit-subject').value.trim();
+            const description = document.getElementById('edit-description').value.trim();
+            const dueDate = document.getElementById('edit-due-date').value;
+            const priority = document.getElementById('edit-priority').value;
+            
+            if (!title) {
+                showNotification('请输入任务标题', 'error');
+                return;
+            }
+            
+            try {
+                const { success, error } = await updateTask(taskId, {
+                    title,
+                    subject,
+                    description,
+                    due_date: dueDate ? new Date(dueDate).toISOString() : null,
+                    priority
+                });
+                
+                if (!success) {
+                    throw new Error(error);
+                }
+                
+                showNotification('任务更新成功！', 'success');
+                // 延迟后返回主页面
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1500);
+                
+            } catch (error) {
+                showNotification(`更新任务失败: ${error.message}`, 'error');
+            }
+        }
+        
+        // 取消编辑
+        function cancelEdit() {
+            window.location.href = 'index.html';
+        }
+        
+        // 返回按钮
+        function goBack() {
+            window.location.href = 'index.html';
+        }
+        
+        // 添加事件监听器
+        document.getElementById('save-btn').addEventListener('click', saveTask);
+        document.getElementById('cancel-btn').addEventListener('click', cancelEdit);
+        document.getElementById('back-btn').addEventListener('click', goBack);
+        
+        // 加载任务数据
+        loadTaskData();
+    </script>
+</body>
+</html>

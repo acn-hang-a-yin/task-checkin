@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>任务打卡系统</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1>任务打卡系统</h1>
+            <nav class="nav">
+                <button id="login-btn" class="btn">登录</button>
+                <button id="logout-btn" class="btn">退出登录</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <div id="content">
+            <!-- 管理员视图 -->
+            <div id="admin-view" class="admin-only">
+                <div class="task-form" id="task-form"></div>
+                
+                <div class="stats-section" id="checkin-stats"></div>
+            </div>
+
+            <!-- 普通用户视图 -->
+            <div id="user-view" class="user-only">
+                <p class="welcome-message">欢迎使用任务打卡系统！</p>
+            </div>
+
+            <!-- 任务列表 -->
+            <div id="task-list"></div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { initPage } from './js/ui.js';
+        
+        // 初始化页面
+        initPage();
+    </script>
+</body>
+</html>

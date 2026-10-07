@@ -28,6 +28,13 @@ export async function renderTaskList() {
   taskList.innerHTML = '';
 
   try {
+    // 在渲染期间禁用所有打卡按钮
+    const allCheckinBtns = document.querySelectorAll('.checkin-btn');
+    allCheckinBtns.forEach(btn => {
+      btn.disabled = true;
+      btn.classList.add('disabled');
+    });
+
     const { success, data, error } = await getAllTasks();
 
     if (!success) {
@@ -48,6 +55,13 @@ export async function renderTaskList() {
 
   } catch (error) {
     showNotification(`加载任务失败: ${error.message}`, 'error');
+  } finally {
+    // 恢复所有打卡按钮状态
+    const allCheckinBtns = document.querySelectorAll('.checkin-btn');
+    allCheckinBtns.forEach(btn => {
+      btn.disabled = false;
+      btn.classList.remove('disabled');
+    });
   }
 }
 
@@ -95,19 +109,19 @@ async function createTaskElement(task, role) {
   if (role === 'admin') {
     const editBtn = taskElement.querySelector('.edit-task');
     const deleteBtn = taskElement.querySelector('.delete-task');
-    
+
     if (editBtn) {
       editBtn.addEventListener('click', () => {
         console.log('编辑按钮被点击，任务ID:', task.id);
-        editTask(task);
+        editTask(task, editBtn);
       });
       console.log('编辑按钮事件监听器已添加');
     } else {
       console.error('找不到编辑按钮');
     }
-    
+
     if (deleteBtn) {
-      deleteBtn.addEventListener('click', () => deleteTaskHandler(task));
+      deleteBtn.addEventListener('click', () => deleteTaskHandler(task, deleteBtn));
       console.log('删除按钮事件监听器已添加');
     } else {
       console.error('找不到删除按钮');
@@ -126,20 +140,26 @@ async function createTaskElement(task, role) {
 }
 
 // 编辑任务
-async function editTask(task) {
+async function editTask(task, editBtn = null) {
   console.log('编辑任务:', task);
   try {
+    // 禁用编辑按钮
+    if (editBtn) {
+      editBtn.disabled = true;
+      editBtn.classList.add('disabled');
+    }
+
     // 在当前页面显示编辑表单
     const taskForm = document.getElementById('task-form');
-    
+
     if (!taskForm) {
       console.error('找不到任务表单容器');
       return;
     }
-    
+
     // 添加编辑模式样式
     taskForm.classList.add('edit-mode');
-    
+
     // 填充表单数据
     taskForm.innerHTML = `
       <h2>编辑任务</h2>
@@ -180,25 +200,25 @@ async function editTask(task) {
         </div>
       </form>
     `;
-    
+
     // 添加表单提交事件
     const form = document.getElementById('edit-task-form');
     if (form) {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        
+
         const taskId = document.getElementById('edit-task-id').value;
         const title = document.getElementById('edit-task-title').value.trim();
         const subject = document.getElementById('edit-task-subject').value.trim();
         const description = document.getElementById('edit-task-description').value.trim();
         const dueDate = document.getElementById('edit-task-due-date').value;
         const priority = document.getElementById('edit-task-priority').value;
-        
+
         if (!title) {
           showNotification('请输入任务标题', 'error');
           return;
         }
-        
+
         try {
           const { success, error } = await updateTask(taskId, {
             title,
@@ -207,7 +227,7 @@ async function editTask(task) {
             due_date: dueDate ? new Date(dueDate).toISOString() : null,
             priority
           });
-          
+
           if (success) {
             showNotification('任务更新成功！', 'success');
             // 重新渲染任务列表和表单
@@ -220,7 +240,7 @@ async function editTask(task) {
           showNotification(`更新任务失败: ${error.message}`, 'error');
         }
       });
-      
+
       // 添加取消按钮事件
       const cancelBtn = form.querySelector('.cancel-edit');
       if (cancelBtn) {
@@ -233,7 +253,7 @@ async function editTask(task) {
           }
         });
       }
-      
+
       console.log('编辑表单事件监听器已添加');
     } else {
       console.error('找不到编辑表单');
@@ -241,16 +261,28 @@ async function editTask(task) {
   } catch (error) {
     console.error('编辑任务失败:', error);
     showNotification(`编辑任务失败: ${error.message}`, 'error');
+  } finally {
+    // 恢复编辑按钮状态
+    if (editBtn) {
+      editBtn.disabled = false;
+      editBtn.classList.remove('disabled');
+    }
   }
 }
 
 // 删除任务
-async function deleteTaskHandler(task) {
+async function deleteTaskHandler(task, deleteBtn = null) {
   if (!confirm(`确定要删除任务"${task.title}"吗？`)) {
     return;
   }
 
   try {
+    // 禁用删除按钮
+    if (deleteBtn) {
+      deleteBtn.disabled = true;
+      deleteBtn.classList.add('disabled');
+    }
+
     const { success, error } = await deleteTask(task.id);
 
     if (success) {
@@ -261,23 +293,49 @@ async function deleteTaskHandler(task) {
     }
   } catch (error) {
     showNotification(`删除任务失败: ${error.message}`, 'error');
+  } finally {
+    // 恢复删除按钮状态
+    if (deleteBtn) {
+      deleteBtn.disabled = false;
+      deleteBtn.classList.remove('disabled');
+    }
   }
 }
 
 // 打卡处理
+let isRenderingTaskList = false;
+
 async function toggleCheckinHandler(task) {
   try {
+    // 禁用所有打卡按钮
+    const allCheckinBtns = document.querySelectorAll('.checkin-btn');
+    allCheckinBtns.forEach(btn => {
+      btn.disabled = true;
+      btn.classList.add('disabled');
+    });
+
     const { success, error, action } = await toggleCheckin(task.id);
 
     if (success) {
       const message = action === 'checked' ? '打卡成功！' : '取消打卡成功！';
       showNotification(message, 'success');
+
+      // 标记任务列表正在渲染
+      isRenderingTaskList = true;
       await renderTaskList();
+      isRenderingTaskList = false;
     } else {
       throw new Error(error);
     }
   } catch (error) {
     showNotification(`打卡操作失败: ${error.message}`, 'error');
+  } finally {
+    // 恢复所有打卡按钮状态
+    const allCheckinBtns = document.querySelectorAll('.checkin-btn');
+    allCheckinBtns.forEach(btn => {
+      btn.disabled = false;
+      btn.classList.remove('disabled');
+    });
   }
 }
 
@@ -289,7 +347,7 @@ export function renderAdminTaskForm() {
 
   // 移除编辑模式样式
   taskForm.classList.remove('edit-mode');
-  
+
   taskForm.innerHTML = `
     <h2>创建新任务</h2>
     <form id="new-task-form">
@@ -334,18 +392,18 @@ export function renderAdminTaskForm() {
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       const title = document.getElementById('task-title').value.trim();
       const subject = document.getElementById('task-subject').value.trim();
       const description = document.getElementById('task-description').value.trim();
       const dueDate = document.getElementById('task-due-date').value;
       const priority = document.getElementById('task-priority').value;
-      
+
       if (!title) {
         showNotification('请输入任务标题', 'error');
         return;
       }
-      
+
       try {
         const { success, error } = await createTask({
           title,
@@ -354,7 +412,7 @@ export function renderAdminTaskForm() {
           due_date: dueDate ? new Date(dueDate).toISOString() : null,
           priority
         });
-        
+
         if (success) {
           showNotification('任务创建成功！', 'success');
           form.reset();
@@ -366,7 +424,7 @@ export function renderAdminTaskForm() {
         showNotification(`创建任务失败: ${error.message}`, 'error');
       }
     });
-    
+
     console.log('管理员任务表单事件监听器已添加');
   } else {
     console.error('找不到新任务表单');
@@ -481,26 +539,58 @@ export async function initPage() {
     console.log('检查登录状态...');
     const isLoggedIn = await checkAuth();
     console.log('登录状态:', isLoggedIn);
-    
+
     if (!isLoggedIn) {
       // 未登录，重定向到登录页
       console.log('用户未登录，跳转到登录页');
       window.location.href = 'login.html';
       return;
     }
-    
+
+    // 设置自动登出计时器（10分钟不操作）
+    let inactivityTimer;
+    const INACTIVITY_TIMEOUT = 5 * 60 * 1000; // 10分钟（毫秒）
+
+    // 重置计时器函数
+    function resetInactivityTimer() {
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+
+      inactivityTimer = setTimeout(async () => {
+        console.log('用户长时间未操作，自动退出登录');
+        const { success } = await logout();
+
+        if (success) {
+          showNotification('由于长时间未操作，已自动退出登录', 'info');
+          // 清除本地存储的token
+          localStorage.clear();
+          window.location.href = 'login.html';
+        }
+      }, INACTIVITY_TIMEOUT);
+    }
+
+    // 初始化计时器
+    resetInactivityTimer();
+
+    // 添加用户活动监听器
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach(event => {
+      document.addEventListener(event, resetInactivityTimer, true);
+    });
+
     // 渲染页面
     console.log('开始渲染页面...');
     await renderPageByRole();
     console.log('页面渲染完成');
-    
+
     // 添加退出登录事件
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async () => {
         console.log('退出登录按钮被点击');
         const { success, error } = await logout();
-        
+
         if (success) {
           window.location.href = 'login.html';
         } else {
@@ -511,7 +601,7 @@ export async function initPage() {
     } else {
       console.error('找不到退出登录按钮');
     }
-    
+
     // 检查URL参数是否包含编辑模式
     const urlParams = new URLSearchParams(window.location.search);
     const taskId = urlParams.get('id');

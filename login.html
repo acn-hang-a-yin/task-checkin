@@ -3,84 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>任务打卡系统 - 登录</title>
+    <title>家庭打卡系统 - 登录</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✅</text></svg>">
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div class="login-container">
         <div class="login-box">
-            <h2>任务打卡系统</h2>
+            <h2>家庭打卡系统</h2>
+            <p class="system-clock" id="system-clock"></p>
+
             <form id="login-form">
                 <div class="form-group">
                     <label for="email">邮箱</label>
-                    <input type="email" id="email" required>
+                    <input type="email" id="email" autocomplete="username" required>
                 </div>
+
                 <div class="form-group">
                     <label for="password">密码</label>
-                    <input type="password" id="password" required>
+                    <input type="password" id="password" autocomplete="current-password" required>
                 </div>
-                <button type="submit" class="btn login-btn">登录</button>
-                <div id="login-error" class="error-message"></div>
+
+                <button type="submit" class="btn login-btn" id="login-submit">登录</button>
+                <div id="login-error" class="error-message" hidden></div>
             </form>
         </div>
     </div>
 
     <script type="module">
-        import { login } from './js/auth.js';
-        import { showNotification } from './js/ui.js';
+        import { login, homePageForRole } from './js/auth.js';
+        import { showNotification, setButtonLoading } from './js/ui-common.js';
+        import { startClock } from './js/clock.js';
+
+        // 实时时钟
+        startClock();
 
         const loginForm = document.getElementById('login-form');
         const loginError = document.getElementById('login-error');
+        const submitBtn = document.getElementById('login-submit');
 
-        // 添加重试机制
+        // 带重试的登录：网络抖动时自动重试，密码错误等业务错误直接返回
         async function loginWithRetry(email, password, maxRetries = 3) {
+            let lastError = '登录失败，请重试';
+
             for (let i = 0; i < maxRetries; i++) {
-                try {
-                    const { success, error, user } = await login(email, password);
-                    
-                    if (success) {
-                        return { success: true, user };
-                    }
-                    
-                    // 如果是最后一次尝试或者不是网络错误，直接返回
-                    if (i === maxRetries - 1 || !error?.message?.includes('network')) {
-                        throw new Error(error);
-                    }
-                    
-                    // 等待一段时间后重试
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                } catch (error) {
-                    if (i === maxRetries - 1) {
-                        throw new Error(`登录失败: ${error.message}（已重试${maxRetries}次）`);
-                    }
+                const { success, error, user } = await login(email, password);
+
+                if (success) return { success: true, user };
+
+                lastError = error || lastError;
+
+                // 不是网络问题就不重试了（例如密码错误）
+                const isNetworkError = /network|fetch|timeout|failed to fetch/i.test(String(lastError));
+                if (!isNetworkError) return { success: false, error: lastError };
+
+                if (i < maxRetries - 1) {
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
                 }
             }
+
+            return { success: false, error: `${lastError}（已重试 ${maxRetries} 次）` };
         }
 
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
-            const email = document.getElementById('email').value;
+
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
-            
+
+            loginError.hidden = true;
             loginError.textContent = '';
-            
+            setButtonLoading(submitBtn, true, '登录中…');
+
             try {
                 const { success, error, user } = await loginWithRetry(email, password);
-                
-                if (!success) {
-                    throw new Error(error);
-                }
-                
-                showNotification('登录成功', 'success');
-                // 登录成功后跳转到主页面
+                if (!success) throw new Error(error);
+
+                showNotification('登录成功，正在进入…', 'success');
+
+                // 登录成功 → 按角色跳转：家长进 admin.html，孩子进 child.html
+                const role = user?.user_metadata?.role || 'user';
                 setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 1000);
-                
+                    window.location.href = homePageForRole(role);
+                }, 800);
             } catch (error) {
+                console.error('登录失败:', error);
                 loginError.textContent = error.message;
+                loginError.hidden = false;
+            } finally {
+                setButtonLoading(submitBtn, false);
             }
         });
     </script>

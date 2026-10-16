@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家庭打卡 · 家长端</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏠</text></svg>">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+    <!-- 顶部固定栏：标题 + 实时时钟 + 昵称 + 退出 -->
+    <header class="app-header">
+        <div class="container header-inner">
+            <div class="brand">
+                <span class="brand-emoji">🏠</span>
+                <h1>家庭打卡 · 家长端</h1>
+            </div>
+            <div class="header-right">
+                <span id="system-clock" class="system-clock"></span>
+                <span class="user-chip" id="header-user">👤 加载中…</span>
+                <button id="logout-btn" class="btn btn-ghost">退出</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 页签：点标签切换，不跳页 -->
+    <nav class="tab-bar">
+        <div class="container tab-inner">
+            <button class="tab-btn active" data-tab="tasks">📋 任务</button>
+            <button class="tab-btn" data-tab="records">📊 记录</button>
+            <button class="tab-btn" data-tab="rewards">🎁 奖励</button>
+            <button class="tab-btn" data-tab="messages">💬 消息</button>
+        </div>
+    </nav>
+
+    <main class="container app-main">
+        <!-- 页签一：任务 -->
+        <section class="tab-panel active" id="panel-tasks">
+            <div class="panel-head">
+                <h2>任务管理</h2>
+                <button id="new-task-btn" class="btn btn-primary">+ 新建任务</button>
+            </div>
+            <p class="panel-tip">任务可以完全自由创建：想建什么任务就建什么任务，没有任何预设限制。</p>
+            <div id="task-list" class="task-list">
+                <p class="loading-text">加载中…</p>
+            </div>
+        </section>
+
+        <!-- 页签二：记录 -->
+        <section class="tab-panel" id="panel-records">
+            <div class="panel-head">
+                <h2>打卡记录</h2>
+                <div class="head-actions">
+                    <select id="record-child-select" class="select"></select>
+                    <button id="export-csv-btn" class="btn">⬇ 导出 CSV</button>
+                </div>
+            </div>
+            <div id="record-overview" class="record-overview"></div>
+            <div id="record-calendar" class="calendar-wrap"></div>
+            <div id="record-day-detail" class="day-detail"></div>
+        </section>
+
+        <!-- 页签三：奖励 -->
+        <section class="tab-panel" id="panel-rewards">
+            <div class="panel-head">
+                <h2>奖励</h2>
+                <div class="head-actions">
+                    <select id="reward-child-select" class="select"></select>
+                </div>
+            </div>
+            <div class="reward-grid">
+                <div class="card" id="star-balance-card">
+                    <p class="loading-text">加载中…</p>
+                </div>
+                <div class="card" id="reward-pool-card">
+                    <p class="loading-text">加载中…</p>
+                </div>
+                <div class="card" id="redemption-card">
+                    <p class="loading-text">加载中…</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 页签四：消息 -->
+        <section class="tab-panel" id="panel-messages">
+            <div class="panel-head">
+                <h2>消息</h2>
+            </div>
+            <div class="card" id="message-form-card">
+                <p class="loading-text">加载中…</p>
+            </div>
+            <div class="card" id="message-history-card">
+                <p class="loading-text">加载中…</p>
+            </div>
+        </section>
+    </main>
+
+    <script type="module">
+        import { initAdminPage } from './js/admin-ui.js';
+
+        // 初始化家长端页面
+        console.log('开始初始化家长端页面');
+        try {
+            initAdminPage();
+        } catch (error) {
+            console.error('家长端页面初始化失败:', error);
+            alert('页面初始化失败，请刷新页面重试');
+        }
+    </script>
+</body>
+</html>

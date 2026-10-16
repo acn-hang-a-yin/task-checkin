@@ -3,51 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>任务打卡系统</title>
+    <title>家庭打卡系统</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✅</text></svg>">
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-    <header class="header">
-        <div class="container">
-            <h1>任务打卡系统</h1>
-            <nav class="nav">
-                <button id="login-btn" class="btn">登录</button>
-                <button id="logout-btn" class="btn">退出登录</button>
-            </nav>
+    <!-- 分流页：登录后按角色自动跳转（家长 → admin.html，孩子 → child.html） -->
+    <div class="login-container">
+        <div class="login-box redirect-box">
+            <h2>家庭打卡系统</h2>
+            <p class="redirect-text">正在进入，请稍候…</p>
+            <p class="system-clock" id="system-clock"></p>
+            <p class="redirect-link"><a href="login.html">没有自动跳转？点这里重新登录</a></p>
         </div>
-    </header>
-
-    <main class="container">
-        <div id="content">
-            <!-- 管理员视图 -->
-            <div id="admin-view" class="admin-only">
-                <div class="task-form" id="task-form"></div>
-                
-                <div class="stats-section" id="checkin-stats"></div>
-            </div>
-
-            <!-- 普通用户视图 -->
-            <div id="user-view" class="user-only">
-                <p class="welcome-message">欢迎使用任务打卡系统！</p>
-            </div>
-
-            <!-- 任务列表 -->
-            <div id="task-list"></div>
-        </div>
-    </main>
+    </div>
 
     <script type="module">
-        import { initPage } from './js/ui.js';
-        
-        // 初始化页面
-        console.log('开始初始化页面');
+        import { getCurrentUser, redirectByRole } from './js/auth.js';
+        import { startClock } from './js/clock.js';
+
+        // 右上角（这里是中间）显示实时时间
+        startClock();
+
         try {
-            initPage();
-            console.log('页面初始化完成');
+            const user = await getCurrentUser();
+
+            if (!user) {
+                console.log('未登录，跳转到登录页');
+                window.location.replace('login.html');
+            } else {
+                console.log('已登录，按角色分流');
+                await redirectByRole();
+            }
         } catch (error) {
-            console.error('页面初始化失败:', error);
-            alert('页面初始化失败，请刷新页面重试');
+            console.error('页面分流失败:', error);
+            window.location.replace('login.html');
         }
     </script>
 </body>

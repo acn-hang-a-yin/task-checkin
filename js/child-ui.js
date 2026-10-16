@@ -28,6 +28,7 @@ const state = {
   viewYear: new Date().getFullYear(),
   viewMonth: new Date().getMonth() + 1,
   selectedDate: todayKey(),
+  currentTab: null,
   loaded: { today: false, records: false, rewards: false, messages: false }
 };
 
@@ -46,6 +47,7 @@ export async function initChildPage() {
   // 3) 绑事件
   bindHeader();
   bindTabs();
+  bindAutoRefresh();
 
   // 4) 我的资料（第一次登录要填昵称和头像）
   await loadMyProfile();
@@ -179,27 +181,75 @@ async function loadTab(name) {
     panel.classList.toggle('active', panel.id === `panel-${name}`);
   });
 
-  if (name === 'messages') markMessagesReadSoon();
-  if (state.loaded[name]) return;
+  // 第一次打开这个页签：正常加载（会显示「加载中…」）
+  // 之后再打开：先把上次的数据摆出来，再在后台静默拉一次最新（stale-while-revalidate），
+  // 这样既不用等着转圈，也不会一直看过期的数据
+  const isFirstOpen = !state.loaded[name];
   state.loaded[name] = true;
+  state.currentTab = name;
+  lastAutoRefreshAt = Date.now(); // 手动点页签也算刷过一次，避免紧接着又自动刷
 
-  if (name === 'today') await loadToday();
-  if (name === 'records') await loadRecords();
-  if (name === 'rewards') await loadRewards();
-  if (name === 'messages') await loadMessages();
+  // 四个页签每次打开都会重新查，「消息」也一样（家长随时可能发新留言）。
+  // 已读标记写在 loadMessages() 里、且只在成功拿到最新列表之后才执行，
+  // 所以不会再出现「红点被清掉了，但孩子没看到新留言」。
+  await refreshTab(name, { silent: !isFirstOpen });
+}
+
+// 按页签名重新拉数据（silent = true 时不显示「加载中…」，失败也不覆盖已有画面）
+async function refreshTab(name, { silent = false } = {}) {
+  if (name === 'today') await loadToday({ silent });
+  if (name === 'records') await loadRecords({ silent });
+  if (name === 'rewards') await loadRewards({ silent });
+  if (name === 'messages') await loadMessages({ silent });
+}
+
+/* ============ 回到页面自动刷新 ============ */
+
+// 从别的标签页 / 别的 App 切回来时，静默拉一次当前页签的数据。
+// 手机上「切出去看一眼再切回来」是常规动作，这样就不用教家人按 F5 了。
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_GAP = 3000; // 3 秒内不重复刷新，避免来回切换时狂发请求
+
+function bindAutoRefresh() {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) autoRefresh();
+  });
+  // 桌面端在多个程序窗口之间切换时 visibilitychange 不一定触发，补一个 focus
+  window.addEventListener('focus', autoRefresh);
+}
+
+function autoRefresh() {
+  if (document.hidden || !state.currentTab) return;
+
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_GAP) return;
+  lastAutoRefreshAt = now;
+
+  // 顶部星星数、消息红点也顺手更新（家长可能刚加/扣了星星，或者刚发了留言）
+  refreshStarBalance();
+  refreshUnreadDot();
+  refreshTab(state.currentTab, { silent: true }).catch((error) => {
+    console.warn('自动刷新失败：', error);
+  });
+}
+
+// 静默刷新失败：只在控制台留个记录，屏幕上继续显示上一次的数据，不打断孩子使用
+function warnSilent(what, error) {
+  console.warn(`[静默刷新] ${what} 读取失败：`, error);
 }
 
 /* ============ 今日页签 ============ */
 
-async function loadToday() {
+async function loadToday({ silent = false } = {}) {
   const listEl = document.getElementById('today-list');
-  if (listEl) listEl.innerHTML = '<p class="loading-text">加载中…</p>';
+  if (listEl && !silent) listEl.innerHTML = '<p class="loading-text">加载中…</p>';
 
   const dateKey = todayKey();
 
   // 1) 今天该打卡的任务
   const taskResult = await getTodayTasks(dateKey);
   if (!taskResult.success) {
+    if (silent) return warnSilent('今日任务', taskResult.error);
     if (listEl) listEl.innerHTML = `<p class="empty-text">读取任务失败：${escapeHtml(taskResult.error)}</p>`;
     return;
   }
@@ -207,6 +257,7 @@ async function loadToday() {
   // 2) 我今天已经打过的卡
   const checkinResult = await getCheckinsByDate(state.user.id, dateKey);
   if (!checkinResult.success) {
+    if (silent) return warnSilent('今日打卡', checkinResult.error);
     if (listEl) listEl.innerHTML = `<p class="empty-text">读取打卡记录失败：${escapeHtml(checkinResult.error)}</p>`;
     return;
   }
@@ -355,12 +406,13 @@ function openCheckinDialog(task) {
 
 /* ============ 记录页签 ============ */
 
-async function loadRecords() {
+async function loadRecords({ silent = false } = {}) {
   const calEl = document.getElementById('child-calendar');
-  if (calEl) calEl.innerHTML = '<p class="loading-text">加载中…</p>';
+  if (calEl && !silent) calEl.innerHTML = '<p class="loading-text">加载中…</p>';
 
   const { success, data, error } = await getCheckinsByUser(state.user.id, { limit: 800 });
   if (!success) {
+    if (silent) return warnSilent('打卡记录', error);
     if (calEl) calEl.innerHTML = `<p class="empty-text">读取记录失败：${escapeHtml(error)}</p>`;
     return;
   }
@@ -464,9 +516,9 @@ function renderChildDayDetail(dateKey) {
 
 /* ============ 奖励页签 ============ */
 
-async function loadRewards() {
+async function loadRewards({ silent = false } = {}) {
   const shopEl = document.getElementById('shop-list');
-  if (shopEl) shopEl.innerHTML = '<p class="loading-text">加载中…</p>';
+  if (shopEl && !silent) shopEl.innerHTML = '<p class="loading-text">加载中…</p>';
 
   // 奖励池、星星余额、星星流水、我的兑换申请一起查
   const [rewardResult, balanceResult, recordResult, redemptionResult] = await Promise.all([
@@ -477,6 +529,7 @@ async function loadRewards() {
   ]);
 
   if (!rewardResult.success) {
+    if (silent) return warnSilent('奖励', rewardResult.error);
     if (shopEl) shopEl.innerHTML = `<p class="empty-text">读取奖励失败：${escapeHtml(rewardResult.error)}</p>`;
     return;
   }
@@ -623,18 +676,22 @@ function renderMyRedemptions() {
 
 /* ============ 消息页签 ============ */
 
-async function loadMessages() {
+async function loadMessages({ silent = false } = {}) {
   const listEl = document.getElementById('message-list');
-  if (listEl) listEl.innerHTML = '<p class="loading-text">加载中…</p>';
+  if (listEl && !silent) listEl.innerHTML = '<p class="loading-text">加载中…</p>';
 
   const { success, data, error } = await getMessagesForUser(state.user.id, 50);
   if (!success) {
+    if (silent) return warnSilent('留言', error);
     if (listEl) listEl.innerHTML = `<p class="empty-text">读取留言失败：${escapeHtml(error)}</p>`;
     return;
   }
 
   state.messages = data;
   renderMessages();
+
+  // 已读标记放在「成功拿到最新列表并渲染出来」之后：孩子确实看到这些留言了才清红点。
+  // （以前是在切页签时先标记已读、再判断要不要重新加载，会出现红点消失了却没看到新留言。）
   markMessagesReadSoon();
 }
 

@@ -28,6 +28,7 @@ const state = {
   viewYear: new Date().getFullYear(),
   viewMonth: new Date().getMonth() + 1,
   selectedDate: todayKey(),
+  currentTab: null,
   loaded: { tasks: false, records: false, rewards: false, messages: false }
 };
 
@@ -46,6 +47,7 @@ export async function initAdminPage() {
   // 3) 先绑事件，避免数据加载慢时点不动
   bindHeader();
   bindTabs();
+  bindAutoRefresh();
 
   // 4) 成员资料：没有资料就弹首次登录引导
   const profile = await getMyProfile();
@@ -104,14 +106,54 @@ async function loadTab(name) {
     panel.classList.toggle('active', panel.id === `panel-${name}`);
   });
 
-  // 每个页签第一次打开时才查数据（懒加载，更快也更省流量）
-  if (state.loaded[name]) return;
+  // 第一次打开这个页签：正常加载（会显示「加载中…」）
+  // 之后再打开：先把上次的数据摆出来，再在后台静默拉一次最新（stale-while-revalidate），
+  // 这样家人切页签不用等转圈，也不会一直看着过期数据（孩子在另一台设备上随时会打卡）
+  const isFirstOpen = !state.loaded[name];
   state.loaded[name] = true;
+  state.currentTab = name;
+  lastAutoRefreshAt = Date.now(); // 手动点页签也算刷过一次，避免紧接着又自动刷
 
-  if (name === 'tasks') await loadTasks();
-  if (name === 'records') await loadRecords();
-  if (name === 'rewards') await loadRewards();
-  if (name === 'messages') await loadMessages();
+  await refreshTab(name, { silent: !isFirstOpen });
+}
+
+// 按页签名重新拉数据（silent = true 时不显示「加载中…」，失败也不覆盖已有画面）
+async function refreshTab(name, { silent = false } = {}) {
+  if (name === 'tasks') await loadTasks({ silent });
+  if (name === 'records') await loadRecords({ silent });
+  if (name === 'rewards') await loadRewards({ silent });
+  if (name === 'messages') await loadMessages({ silent });
+}
+
+/* ============ 回到页面自动刷新 ============ */
+
+// 从别的标签页 / 别的程序切回来时，静默拉一次当前页签的数据（不用再按 F5）
+let lastAutoRefreshAt = 0;
+const AUTO_REFRESH_GAP = 3000; // 3 秒内不重复刷新，避免来回切换时狂发请求
+
+function bindAutoRefresh() {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) autoRefresh();
+  });
+  // 桌面端在多个程序窗口之间切换时 visibilitychange 不一定触发，补一个 focus
+  window.addEventListener('focus', autoRefresh);
+}
+
+function autoRefresh() {
+  if (document.hidden || !state.currentTab) return;
+
+  const now = Date.now();
+  if (now - lastAutoRefreshAt < AUTO_REFRESH_GAP) return;
+  lastAutoRefreshAt = now;
+
+  refreshTab(state.currentTab, { silent: true }).catch((error) => {
+    console.warn('自动刷新失败：', error);
+  });
+}
+
+// 静默刷新失败：只在控制台留个记录，屏幕上继续显示上一次的数据，不打断家长操作
+function warnSilent(what, error) {
+  console.warn(`[静默刷新] ${what} 读取失败：`, error);
 }
 
 /* ============ 家长资料（首次登录引导） ============ */
@@ -234,12 +276,13 @@ function childName(userId) {
 
 /* ============ 页签一：任务 ============ */
 
-async function loadTasks() {
+async function loadTasks({ silent = false } = {}) {
   const listEl = document.getElementById('task-list');
-  if (listEl) listEl.innerHTML = '<p class="loading-text">加载中…</p>';
+  if (listEl && !silent) listEl.innerHTML = '<p class="loading-text">加载中…</p>';
 
   const { success, data, error } = await getAllTasks();
   if (!success) {
+    if (silent) return warnSilent('任务列表', error);
     if (listEl) listEl.innerHTML = `<p class="empty-text">读取任务失败：${escapeHtml(error)}</p>`;
     return;
   }
@@ -598,7 +641,7 @@ function collectTaskForm(modal) {
 
 /* ============ 页签二：记录 ============ */
 
-async function loadRecords() {
+async function loadRecords({ silent = false } = {}) {
   const childId = state.recordChildId;
   const overviewEl = document.getElementById('record-overview');
   const calEl = document.getElementById('record-calendar');
@@ -618,16 +661,20 @@ async function loadRecords() {
     return;
   }
 
-  if (calEl) calEl.innerHTML = '<p class="loading-text">加载中…</p>';
+  if (calEl && !silent) calEl.innerHTML = '<p class="loading-text">加载中…</p>';
 
   // 任务列表用来算每个任务的完成率（如果先打开「记录」页，这里顺手补齐）
   await ensureTasks();
 
   const { success, data, error } = await getCheckinsByUser(childId, { limit: 800 });
   if (!success) {
+    if (silent) return warnSilent('打卡记录', error);
     if (calEl) calEl.innerHTML = `<p class="empty-text">读取打卡记录失败：${escapeHtml(error)}</p>`;
     return;
   }
+
+  // 查询期间家长可能切换了孩子，这次结果就作废，别把新孩子的画面覆盖掉
+  if (childId !== state.recordChildId) return;
 
   state.checkins = data;
   renderRecordOverview();
@@ -844,7 +891,7 @@ function exportCurrentChildCheckins() {
 
 /* ============ 页签三：奖励 ============ */
 
-async function loadRewards() {
+async function loadRewards({ silent = false } = {}) {
   const childId = state.rewardChildId;
 
   const [pool, redemptions] = await Promise.all([
@@ -852,10 +899,23 @@ async function loadRewards() {
     getRedemptions({ limit: 100 })
   ]);
 
+  // 查询期间家长可能切换了孩子，这次结果就作废，别把新孩子的画面覆盖掉
+  if (childId !== state.rewardChildId) return;
+
   state.rewards = pool.success ? pool.data : [];
   state.redemptions = redemptions.success ? redemptions.data : [];
 
+  // 静默刷新时先记住家长正在填的「星星数量 / 原因」，渲染完再填回去，别一刷新就清零
+  const keepAmount = silent ? document.getElementById('star-amount')?.value : null;
+  const keepReason = silent ? document.getElementById('star-reason')?.value : null;
+
   await renderStarBalanceCard(childId);
+
+  const amountEl = keepAmount == null ? null : document.getElementById('star-amount');
+  const reasonEl = keepReason == null ? null : document.getElementById('star-reason');
+  if (amountEl) amountEl.value = keepAmount;
+  if (reasonEl) reasonEl.value = keepReason;
+
   renderRewardPool();
   renderRedemptionCard();
 }
@@ -1186,7 +1246,7 @@ async function reviewRedemptionById(redemptionId, decision) {
 // 发过的留言缓存（只在这页用，不放进 state）
 let sentMessageCache = [];
 
-async function loadMessages() {
+async function loadMessages({ silent = false } = {}) {
   const formEl = document.getElementById('message-form-card');
   const historyEl = document.getElementById('message-history-card');
 
@@ -1196,12 +1256,14 @@ async function loadMessages() {
     return;
   }
 
-  renderMessageForm();
+  // 静默刷新时表单已经建好了就别重建，否则会把家长正在输入的文字清掉
+  if (!formEl?.querySelector('#message-send')) renderMessageForm();
 
-  if (historyEl) historyEl.innerHTML = '<p class="loading-text">加载中…</p>';
+  if (historyEl && !silent) historyEl.innerHTML = '<p class="loading-text">加载中…</p>';
 
   const { success, data, error } = await getSentMessages(50);
   if (!success) {
+    if (silent) return warnSilent('留言', error);
     if (historyEl) historyEl.innerHTML = `<p class="empty-text">读取留言失败：${escapeHtml(error)}</p>`;
     return;
   }

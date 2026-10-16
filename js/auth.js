@@ -2,6 +2,41 @@
 import { getSupabaseClient } from './supabase-config.js';
 import { showNotification } from './ui-common.js';
 
+/**
+ * 把 Supabase 返回的英文报错翻译成看得懂的中文
+ * 说明：原始错误（code / status / message）一律打到控制台，方便排查
+ * @param {object} error Supabase 返回的 error 对象
+ * @returns {string} 面向用户的中文提示
+ */
+function friendlyAuthError(error) {
+  const code = error?.code || '';
+  const msg = error?.message || '';
+
+  console.error('Supabase 登录原始错误:', { code, status: error?.status, message: msg });
+
+  const codeMap = {
+    invalid_credentials: '邮箱或密码不正确，请重新输入',
+    email_not_confirmed: '该邮箱还没有验证：请到 Supabase → Authentication → Users 里确认这个账号',
+    user_banned: '该账号已被禁用，请联系管理员',
+    weak_password: '密码强度不够，请换一个更复杂的密码',
+    over_request_rate_limit: '尝试次数过多，请等一会儿再试',
+    over_email_send_rate_limit: '操作太频繁了，请稍后再试',
+    validation_failed: '邮箱格式不正确，请检查后重试',
+    signup_disabled: '该项目已关闭注册，请在 Supabase 后台手动建账号'
+  };
+
+  if (codeMap[code]) return codeMap[code];
+
+  if (/invalid api key|no api key/i.test(msg)) {
+    return 'Supabase Key 不正确，请检查 js/supabase-config.js';
+  }
+  if (/failed to fetch|network|load failed|timeout|err_/i.test(msg)) {
+    return '网络连接失败，请检查网络后刷新页面重试';
+  }
+
+  return msg || '登录失败，请重试';
+}
+
 // 登录函数
 export async function login(email, password) {
   try {
@@ -12,7 +47,7 @@ export async function login(email, password) {
     });
 
     if (error) {
-      throw new Error(error.message);
+      throw new Error(friendlyAuthError(error));
     }
 
     return { success: true, user: data.user };

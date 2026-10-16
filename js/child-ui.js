@@ -9,6 +9,7 @@ import { getMessagesForUser, getUnreadCount, markAllMessagesRead } from './messa
 import { getStarBalance, getStarRecords } from './star-api.js';
 import { todayKey, buildMonthMatrix, getOverallStreak, getBadgeStates, isTaskScheduledOn } from './stats.js';
 import { startClock } from './clock.js';
+import { startIdleLogout } from './idle-logout.js';
 import {
   showNotification, escapeHtml, showModal, formatDateTime, formatTimeLabel, setButtonLoading
 } from './ui-common.js';
@@ -48,6 +49,7 @@ export async function initChildPage() {
   bindHeader();
   bindTabs();
   bindAutoRefresh();
+  startIdleLogout(); // 5 分钟没有任何操作就自动退出登录（见 js/idle-logout.js）
 
   // 4) 我的资料（第一次登录要填昵称和头像）
   await loadMyProfile();
@@ -417,10 +419,7 @@ async function loadRecords({ silent = false } = {}) {
     return;
   }
 
-  state.allCheckins = data;
-  renderStreakText();
-  renderChildCalendar();
-  renderChildDayDetail(state.selectedDate);
+  applyCheckins(data);
 }
 
 function renderStreakText() {
@@ -431,6 +430,17 @@ function renderStreakText() {
   const streak = getOverallStreak(keys);
 
   el.textContent = streak > 0 ? `🔥 连续打卡 ${streak} 天` : '今天还没打卡';
+}
+
+// 打卡记录更新后统一重画：连续天数、日历、当天详情
+// （勋章墙用的是同一份 state.allCheckins，由 loadRewards() 自己再画一次）
+function applyCheckins(data) {
+  if (!Array.isArray(data)) return;
+
+  state.allCheckins = data;
+  renderStreakText();
+  renderChildCalendar();
+  renderChildDayDetail(state.selectedDate);
 }
 
 function renderChildCalendar() {
@@ -520,12 +530,15 @@ async function loadRewards({ silent = false } = {}) {
   const shopEl = document.getElementById('shop-list');
   if (shopEl && !silent) shopEl.innerHTML = '<p class="loading-text">加载中…</p>';
 
-  // 奖励池、星星余额、星星流水、我的兑换申请一起查
-  const [rewardResult, balanceResult, recordResult, redemptionResult] = await Promise.all([
+  // 奖励池、星星余额、星星流水、我的兑换申请，以及打卡记录一起查。
+  // 打卡记录是「勋章墙 / 连续打卡 N 天」的算料：这个天数必须和星星一样是刚查回来的，
+  // 不能吃「今日」「记录」页签留下的旧数组（家长删掉打卡后星星立刻变 0，天数也要跟着变 0）。
+  const [rewardResult, balanceResult, recordResult, redemptionResult, checkinResult] = await Promise.all([
     getRewards(true),
     getStarBalance(state.user.id),
     getStarRecords(state.user.id, 20),
-    getRedemptions({ userId: state.user.id, limit: 50 })
+    getRedemptions({ userId: state.user.id, limit: 50 }),
+    getCheckinsByUser(state.user.id, { limit: 800 })
   ]);
 
   if (!rewardResult.success) {
@@ -539,6 +552,8 @@ async function loadRewards({ silent = false } = {}) {
   state.redemptions = redemptionResult.success ? redemptionResult.data : [];
   if (balanceResult.success) state.balance = balanceResult.data;
 
+  // 先刷新打卡数据（查失败就保持上一次的，不会把勋章墙清空），再画勋章墙
+  applyCheckins(checkinResult.success ? checkinResult.data : null);
   renderBadges();
   renderShop();
   renderMyRedemptions();
@@ -550,8 +565,10 @@ function renderBadges() {
   const el = document.getElementById('badge-wall');
   if (!el) return;
 
-  const source = state.allCheckins.length ? state.allCheckins : state.todayCheckins;
-  const keys = source.filter((c) => c.is_checked !== false).map((c) => c.checkin_date);
+  // 只认 state.allCheckins：loadRewards() 每次打开「奖励」页都会把最新打卡记录查回来（见下面的 applyCheckins）。
+  // 旧写法是「allCheckins 为空就退回 state.todayCheckins」——家长把打卡删掉后 allCheckins 正好是空数组，
+  // 于是退回「今日」页签留下的旧数组，勋章墙就会一直显示那条已经被删掉的打卡（星星已扣回 0，这里还写差 6 天）。
+  const keys = state.allCheckins.filter((c) => c.is_checked !== false).map((c) => c.checkin_date);
   const streak = getOverallStreak(keys);
   const badges = getBadgeStates(streak);
 

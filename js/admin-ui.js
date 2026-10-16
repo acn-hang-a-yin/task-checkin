@@ -10,6 +10,7 @@ import { getStarBalance, getStarRecords, addStars, deductStars } from './star-ap
 import { todayKey, buildMonthMatrix, getOverallStreak, getCompletionRate, isTaskScheduledOn, downloadCsv } from './stats.js';
 import { QUICK_FILL, getMyPresets, saveMyPreset, removeMyPreset } from './presets.js';
 import { startClock } from './clock.js';
+import { startIdleLogout } from './idle-logout.js';
 import {
   showNotification, escapeHtml, showModal, confirmDialog,
   formatDateTime, formatTimeLabel, setButtonLoading
@@ -48,6 +49,7 @@ export async function initAdminPage() {
   bindHeader();
   bindTabs();
   bindAutoRefresh();
+  startIdleLogout(); // 5 分钟没有任何操作就自动退出登录（见 js/idle-logout.js）
 
   // 4) 成员资料：没有资料就弹首次登录引导
   const profile = await getMyProfile();

@@ -1,93 +1,60 @@
-# 任务打卡系统
+# 家庭打卡系统
 
-一个基于 Supabase 的任务打卡管理系统，支持管理员创建任务、用户打卡功能。
+一个给家庭用的「任务打卡 + 星星奖励」小系统：家长建任务、看记录、批奖励，孩子打卡、赚星星、换奖励。
+原生 HTML / CSS / JavaScript（ES Module）+ Supabase（数据库 + 登录 + 图片存储），无框架、无打包、无 RLS。
 
-## 功能特性
+## 两种角色
 
-- **管理员功能**：
-  - 创建、编辑、删除任务
-  - 查看所有用户的打卡统计
-  - 管理用户权限
+| 角色 | 登录后进入 | 能做什么 |
+|---|---|---|
+| 家长（`user_metadata.role = "admin"`） | `admin.html`（4 个页签：任务 / 记录 / 奖励 / 消息） | 建 / 改 / 暂停 / 结束 / 删除任务；看打卡记录、完成率、日历；导出 CSV；手动加星、扣星；审核兑换；发留言 |
+| 孩子（不填，默认 `user`） | `child.html`（4 个页签：今日 / 记录 / 奖励 / 消息） | 打卡（勾选 / 照片 / 文字）得星星；看日历、连续天数、勋章；申请兑换；看家长留言 |
 
-- **普通用户功能**：
-  - 查看任务列表
-  - 打卡/取消打卡
-  - 查看个人打卡记录
+## 快速开始
 
-## 技术栈
+1. 在 Supabase 建项目，把 URL 和 Anon Key 填进 `js/supabase-config.js`。
+2. 在 Supabase SQL Editor 里按 **`task-checkin-system.md` 第 4 章** 的顺序建表（7 张表 + 1 个 Storage 桶，SQL 全部可重复执行）。
+3. 在 Supabase → Authentication → Users 建账号：孩子账号勾选 Auto Confirm User 即可；家长账号再在 Raw User Meta Data 里填 `{"role":"admin"}`。
+4. 用本地服务器打开 `index.html`（例如 VS Code Live Server 或 `python -m http.server`）。
+   ⚠️ 直接双击 html 文件会因为浏览器限制 ES Module 而白屏，需要 `http://` 协议。
 
-- **前端**：HTML5, CSS3, JavaScript (ES6+)
-- **数据库**：Supabase (PostgreSQL)
-- **认证**：Supabase Auth
-- **部署**：GitHub Pages
+## 文档
 
-## 本地开发
+| 文件 | 说明 |
+|---|---|
+| **`task-checkin-system.md`** | ★ 项目技术文档（合并版）：数据库、页面、**每个数字的计算口径**、模块职责、更新日志 |
+| **`guide.html`** | ★ 使用说明（给家人看的独立静态文件，浏览器直接打开，不需要登录；不在页面上放入口） |
+| `docs/` | 已合并到上面两份文档，只留一个指路文件 |
 
-1. 克隆项目到本地
-2. 在 Supabase 项目设置中配置数据库表：
-   - `tasks` 表：存储任务信息
-   - `task_checkins` 表：存储打卡记录
-3. 更新 `js/supabase-config.js` 中的 URL 和 Anon Key
-4. 用浏览器打开 `index.html` 或 `login.html`
+## 目录结构（主要文件）
+
+```
+index.html / login.html      # 分流页 / 登录页
+admin.html / child.html      # 家长端 / 孩子端（各 4 个页签）
+guide.html                   # 使用说明（独立静态文件，页面里不放入口）
+css/  style.css app.css child.css
+js/   supabase-config.js auth.js clock.js idle-logout.js ui-common.js
+      task-api.js checkin-api.js member-api.js star-api.js
+      reward-api.js message-api.js stats.js presets.js
+      admin-ui.js child-ui.js
+      vendor/supabase/       # 本地化的 supabase-js（不依赖 CDN）
+```
 
 ## 部署到 GitHub Pages
 
-### 1. 创建 GitHub 仓库
-- 将项目推送到 GitHub 仓库
-- 确保仓库设置为 Public（GitHub Pages 仅支持 Public 仓库）
-
-### 2. 启用 GitHub Pages
-- 进入仓库的 Settings
-- 找到 Pages 部分
-- Source 选择 "Deploy from a branch"
-- 选择 main/master 分支
-- 点击 Save
-
-### 3. 配置自定义域名（可选）
-- 在 Pages 设置中配置自定义域名
-
-### 4. 注意事项
-- 确保所有文件路径正确
-- 检查 JavaScript 模块导入路径
-- 等待几分钟让 GitHub Pages 更新缓存
+1. 推送到 GitHub 仓库（Public）。
+2. Settings → Pages → Source 选 main 分支 → Save。
+3. 等几分钟，访问 `https://<用户名>.github.io/<仓库名>/index.html`。
 
 ## 故障排除
 
-### 常见问题
-
-1. **`net::ERR_CONNECTION_RESET` 错误**
-   - 检查网络连接
-   - 尝试清除浏览器缓存（Ctrl+Shift+R）
-   - 检查 Supabase 服务状态
-
-2. **`favicon.ico 404` 错误**
-   - 已通过内联 SVG favicon 解决
-   - 不影响系统功能
-
-3. **模块加载失败**
-   - 检查 JavaScript 文件路径
-   - 确保文件编码为 UTF-8
-   - 检查 GitHub Pages 文件结构
-
-### 调试步骤
-
-1. 打开浏览器开发者工具 (F12)
-2. 查看 Console 标签中的错误信息
-3. 查看 Network 标签中的请求状态
-4. 检查 Supabase 控制台中的错误日志
-
-## 环境变量
-
-在 `js/supabase-config.js` 中配置：
-
-```javascript
-const SUPABASE_URL = '你的 Supabase 项目 URL';
-const SUPABASE_ANON_KEY = '你的 Supabase Anon Key';
-```
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
+| 现象 | 处理 |
+|---|---|
+| 改完代码页面没变化 | 浏览器缓存了 ES Module，按 `Ctrl + Shift + R` 强刷 |
+| 直接双击 html 白屏 | 用本地服务器（需 `http://` 协议），或部署到 GitHub Pages |
+| 登录失败 | 看浏览器控制台里的原始错误（`auth.js` 会把英文错误翻译成中文提示）；确认 `js/supabase-config.js` 里的 URL / Key 正确 |
+| 页面提示「读取失败」 | 多半是网络或 Supabase 临时问题，刷新重试；数据没丢 |
+| `favicon.ico 404` | 各页面已用内联 SVG 图标，不影响功能 |
 
 ## 许可证
 

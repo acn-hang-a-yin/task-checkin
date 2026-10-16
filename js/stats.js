@@ -55,52 +55,9 @@ export function isTaskScheduledOn(task, dateKey) {
   return true; // 默认每天
 }
 
-/** 任务从 fromKey 到 toKey 之间「应打卡」的天数 */
-export function countScheduledDays(task, fromKey, toKey) {
-  let count = 0;
-  let cursor = parseDateKey(fromKey);
-  let guard = 0;
-
-  while (toDateKey(cursor) <= toKey && guard < 3660) {
-    if (isTaskScheduledOn(task, toDateKey(cursor))) count++;
-    cursor = addDays(cursor, 1);
-    guard++;
-  }
-
-  return count;
-}
-
-/**
- * 某一个任务的「当前连续打卡天数」
- * 规则：从今天往回数；今天还没打卡就从昨天开始数（避免早上显示 0）；
- *       遇到「应打卡但没打」的天就停；非应打卡日（如每周任务没安排的那天）自动跳过。
- */
-export function getStreakForTask(task, checkinDateKeys) {
-  const done = new Set(checkinDateKeys || []);
-  let cursor = parseDateKey(todayKey());
-
-  if (!done.has(toDateKey(cursor))) cursor = addDays(cursor, -1);
-
-  let streak = 0;
-  for (let guard = 0; guard < 3660; guard++) {
-    const key = toDateKey(cursor);
-
-    if (done.has(key)) {
-      streak++;
-      cursor = addDays(cursor, -1);
-      continue;
-    }
-
-    if (!isTaskScheduledOn(task, key)) {
-      cursor = addDays(cursor, -1);
-      continue;
-    }
-
-    break; // 应打卡却没打 → 断卡
-  }
-
-  return streak;
-}
+// 说明：原来的 countScheduledDays()（算区间内应打卡天数）已并入 getCompletionRate() 的循环，
+// getStreakForTask()（单个任务的连续天数）没有任何页面在用 —— 页面统一显示
+// getOverallStreak()（当天完成过任意任务就算打卡日），这两个函数已删除。
 
 /** 综合连续打卡天数：只要当天完成过任意一个任务就算打卡日 */
 export function getOverallStreak(checkinDateKeys) {
@@ -120,12 +77,49 @@ export function getOverallStreak(checkinDateKeys) {
 }
 
 /**
+ * 算出「完成率」该统计哪一段时间（口径要和日历的「应打卡」一致：只算任务处于进行中的那些天）
+ * - 已结束：统计到最后一次打卡那天（一次都没打过卡 → 返回 null，页面显示「—」，不显示 0%）
+ * - 已暂停：统计到「暂停那一刻」——暂停时 task-api.js 会写 tasks.updated_at，所以暂停日之后
+ *   不再往分母里加天数（库里没有暂停历史，这是最贴近的做法；详见文档第 7.3 节）
+ * - 进行中：从任务创建日统计到今天
+ * @param {object} task 任务（需要 created_at / status / updated_at）
+ * @param {string[]} checkinDateKeys 这个任务的打卡日期列表
+ * @returns {{fromKey: string, toKey: string}|null} null 表示「没有可统计的历史」
+ */
+export function getRateRange(task, checkinDateKeys = []) {
+  const keys = [...new Set((checkinDateKeys || []).filter(Boolean))].sort();
+  const fromKey = toDateKey(task?.created_at) || todayKey();
+
+  if (task?.status === 'ended') {
+    if (!keys.length) return null;
+    return { fromKey, toKey: keys[keys.length - 1] };
+  }
+
+  if (task?.status === 'paused') {
+    const pausedAt = toDateKey(task?.updated_at);
+    // 异常数据（updated_at 早于创建日 / 读不到）就退回今天，宁可多算也不要算错区间
+    return { fromKey, toKey: pausedAt && pausedAt >= fromKey ? pausedAt : todayKey() };
+  }
+
+  return { fromKey, toKey: todayKey() };
+}
+
+/**
  * 完成率
+ * 分母 = 区间内「该打卡」的天数，分子 = 区间内真正打过卡的天数（同一任务同一天只算 1 天）
+ * @param {object} task 任务
+ * @param {string[]} checkinDateKeys 打卡日期列表
+ * @param {{fromKey?: string, toKey?: string}} options 统计区间，一般由 getRateRange() 算好
  * @returns {{expected: number, done: number, rate: number}} expected=应打卡天数，done=实际打卡天数，rate=百分比
  */
 export function getCompletionRate(task, checkinDateKeys, options = {}) {
-  const fromKey = options.fromKey || toDateKey(task.created_at) || todayKey();
-  const toKey = options.toKey || todayKey();
+  // 不传区间时直接按 getRateRange() 的口径算：
+  // 进行中 → 到今天；已暂停 → 到暂停那天；已结束 → 到最后一次打卡
+  // （这样即使调用方只传两个参数，也不会再出现「暂停任务分母一直涨」的老问题）
+  const range = getRateRange(task, checkinDateKeys);
+
+  const fromKey = options.fromKey || range?.fromKey || toDateKey(task?.created_at) || todayKey();
+  const toKey = options.toKey || range?.toKey || todayKey();
   const done = new Set(checkinDateKeys || []);
 
   let expected = 0;

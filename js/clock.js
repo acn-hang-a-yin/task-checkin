@@ -22,10 +22,4 @@ export function startClock(elId = 'system-clock') {
   return setInterval(tick, 1000);
 }
 
-/**
- * 停止时钟（页面卸载时浏览器会自动清理，一般不需要手动调用）
- * @param {number|null} timerId startClock() 的返回值
- */
-export function stopClock(timerId) {
-  if (timerId) clearInterval(timerId);
-}
+// 说明：stopClock() 没有任何页面在用（定时器随页面卸载由浏览器自动清理），已删除。

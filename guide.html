@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家庭打卡系统 · 使用说明</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/app.css">
+    <style>
+        /* 说明页专用样式（只影响本页，类名统一 doc- 开头；本页不加载任何 JS，业务页打不开也能看） */
+        .doc-main { padding: 18px 0 60px; }
+        .doc-grid { display: grid; grid-template-columns: 208px 1fr; gap: 22px; align-items: start; }
+
+        .doc-toc { position: sticky; top: 14px; }
+        .doc-toc h3 { margin: 0 0 10px; font-size: 1rem; }
+        .doc-toc a { display: block; padding: 6px 8px; border-radius: 8px; color: #22313f; text-decoration: none; font-size: 0.94rem; }
+        .doc-toc a:hover { background: rgba(74, 108, 247, 0.10); }
+        .doc-toc .doc-toc-sub { padding-left: 18px; font-size: 0.88rem; opacity: 0.85; }
+
+        .doc-main h2 { margin: 0 0 10px; padding-bottom: 6px; font-size: 1.25rem; border-bottom: 2px solid rgba(74, 108, 247, 0.18); }
+        .doc-main h3 { margin: 18px 0 8px; font-size: 1.05rem; }
+        .doc-main p, .doc-main li { line-height: 1.75; }
+
+        .doc-card { background: #fff; border-radius: 14px; padding: 18px 20px; box-shadow: 0 4px 16px rgba(0,0,0,0.06); margin-bottom: 16px; }
+        .doc-table-wrap { overflow-x: auto; margin: 10px 0 6px; }
+        .doc-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+        .doc-table th, .doc-table td { padding: 9px 10px; border-bottom: 1px solid #e8ecf2; text-align: left; vertical-align: top; }
+        .doc-table th { background: #f4f7fd; white-space: nowrap; }
+        .doc-table tr:last-child td { border-bottom: none; }
+
+        .doc-formula {
+            background: #f7f9ff; border: 1px dashed rgba(74,108,247,0.45); border-left: 4px solid #4a6cf7;
+            border-radius: 10px; padding: 12px 14px; margin: 10px 0; font-family: Consolas, "Courier New", monospace;
+            font-size: 0.95rem; overflow-x: auto; white-space: pre-wrap;
+        }
+        .doc-steps { counter-reset: docstep; list-style: none; padding-left: 0; }
+        .doc-steps li { counter-increment: docstep; position: relative; padding-left: 34px; margin-bottom: 8px; }
+        .doc-steps li::before {
+            content: counter(docstep); position: absolute; left: 0; top: 3px; width: 24px; height: 24px;
+            border-radius: 50%; background: #4a6cf7; color: #fff; font-size: 0.85rem;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .doc-note { border-radius: 10px; padding: 12px 14px; margin: 10px 0; font-size: 0.95rem; line-height: 1.7; }
+        .doc-note-tip { background: #eef6ff; border-left: 4px solid #4a6cf7; }
+        .doc-note-warn { background: #fff7e8; border-left: 4px solid #f39c12; }
+        .doc-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+        .doc-dot-green { background: #2ecc71; }
+        .doc-dot-yellow { background: #f39c12; }
+        .doc-dot-grey { background: #dfe3ea; }
+        .doc-top-links { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        @media (max-width: 860px) {
+            .doc-grid { grid-template-columns: 1fr; }
+            .doc-toc { position: static; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部栏：和业务页面同一套样式，但本页不要求登录、不加载 JS -->
+    <header class="app-header">
+        <div class="container header-inner">
+            <div class="brand">
+                <span class="brand-emoji">📖</span>
+                <h1>家庭打卡系统 · 使用说明</h1>
+            </div>
+            <div class="header-right doc-top-links">
+                <a class="btn btn-primary" href="login.html">打开系统（登录）</a>
+                <a class="btn btn-ghost" href="task-checkin-system.md">技术文档（MD）</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container doc-main">
+        <div class="doc-grid">
+            <!-- 目录 -->
+            <nav class="doc-card doc-toc">
+                <h3>目录</h3>
+                <a href="#s1">1. 30 秒看懂</a>
+                <a href="#s2">2. 每天怎么用</a>
+                <a href="#s3">3. ★ 每个数字怎么算</a>
+                <a class="doc-toc-sub" href="#s3-1">① 今日进度 x/y</a>
+                <a class="doc-toc-sub" href="#s3-2">② 连续打卡天数</a>
+                <a class="doc-toc-sub" href="#s3-3">③ 完成率</a>
+                <a class="doc-toc-sub" href="#s3-4">④ 日历绿点 / 黄点</a>
+                <a class="doc-toc-sub" href="#s3-5">⑤ 概览 4 个数字</a>
+                <a class="doc-toc-sub" href="#s3-6">⑥ 星星与勋章</a>
+                <a class="doc-toc-sub" href="#s3-7">⑦ 消息红点</a>
+                <a href="#s4">4. 数据存在哪张表</a>
+                <a href="#s5">5. 常见问题</a>
+                <a href="#s6">6. 给维护者</a>
+            </nav>
+
+            <div>
+                <!-- 1 -->
+                <section class="doc-card" id="s1">
+                    <h2>1. 30 秒看懂</h2>
+                    <p>这是一个给<strong>一个家庭</strong>用的「任务打卡 + 星星奖励」小系统：家长建任务、孩子打卡；打卡得星星，星星换奖励。</p>
+                    <div class="doc-table-wrap">
+                        <table class="doc-table">
+                            <thead>
+                                <tr><th>你是谁</th><th>登录后进哪个页面</th><th>你能做什么</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>👨‍👩‍👧 家长</td>
+                                    <td><code>admin.html</code>（家长端）</td>
+                                    <td>建 / 改 / 暂停 / 结束 / 删除任务；看孩子的打卡记录和完成率；导出 CSV；手动加星、扣星；审核兑换；发留言</td>
+                                </tr>
+                                <tr>
+                                    <td>🧒 孩子</td>
+                                    <td><code>child.html</code>（孩子端）</td>
+                                    <td>看今天要做什么 → 打卡（勾选 / 拍照 / 说一句）→ 得星星；看自己的日历、连续天数、勋章；用星星申请兑换；看家长留言</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="doc-note doc-note-tip">
+                        本页是一份<strong>独立说明文件</strong>（<code>guide.html</code>），系统页面上<strong>没有</strong>放它的入口：
+                        把文件发给家人、收藏成书签或打印出来都行，随时能看，也不需要登录。<br>
+                        打开系统：浏览器进入 <code>index.html</code>（会自动分流）或 <code>login.html</code>（登录页）。
+                        角色不对会被自动送回自己的页面：孩子进不了家长端，家长也进不了孩子端。
+                    </div>
+                </section>
+
+                <!-- 2 -->
+                <section class="doc-card" id="s2">
+                    <h2>2. 每天怎么用</h2>
+
+                    <h3>家长（第一次，约 5 分钟）</h3>
+                    <ol class="doc-steps">
+                        <li>在 Supabase 控制台建好孩子账号（Authentication → Users → Add user，记得勾 Auto Confirm User）。</li>
+                        <li>登进家长端 → 「📋 任务」→「+ 新建任务」，把任务名、周期（每天 / 每周几）、截止时间、打卡形式、几颗星填好。</li>
+                        <li>「🎁 奖励」页先建几个奖励，标上需要几颗星（例如「看动画 30 分钟 = 10 ⭐」）。</li>
+                        <li>「💬 消息」页发一句留言，孩子打开页面就能看到红点提醒。</li>
+                        <li>之后每天看一眼「📊 记录」页：谁打卡了、哪天漏了、完成率多少。</li>
+                    </ol>
+
+                    <h3>孩子（每天）</h3>
+                    <ol class="doc-steps">
+                        <li>登录后默认在「✅ 今日」，卡片上写着今天要做的任务。</li>
+                        <li>做完一个就点它 → 拍照 / 写一句话 → 「提交打卡」，会提示「打卡成功！获得 N 颗星星 ⭐」。</li>
+                        <li>「📅 记录」看自己的日历和连续天数；「🎁 奖励」看勋章墙和星星，够星就点「兑换」申请奖励。</li>
+                    </ol>
+
+                    <div class="doc-note doc-note-tip">
+                        两个贴心小设计：从别的 App 切回来时页面<strong>自动刷新</strong>成最新数据；<strong>5 分钟</strong>没有任何操作会自动退出登录（防止平板一直亮着没人管）。<br>
+                        想改名字或换头像：点右上角自己的<strong>昵称</strong>，弹窗顶部会先显示你<strong>当前</strong>的昵称和头像。
+                    </div>
+                </section>
+                <!-- 3 -->
+                <section class="doc-card" id="s3">
+                    <h2>3. ★ 每个数字是怎么算出来的</h2>
+                    <p>先记住三条规则，后面所有数字都靠它们：</p>
+                    <ol>
+                        <li><strong>「这天打卡了」</strong>＝ 打卡表里有一条记录（同一个任务、同一天只留一条；取消或纠正都是直接删记录）。</li>
+                        <li><strong>「这天该打卡」</strong>＝ 任务处于<strong>进行中</strong>，并且周期包含这一天：
+                            <em>每天</em>的任务天天算；<em>每周</em>的任务只算勾选的那几天（1 = 周一 … 7 = 周日）；
+                            任务「已结束」一律不算，「已暂停」从暂停那天起不再算。</li>
+                        <li><strong>日期按手机 / 电脑的本地时间算</strong>，所以不会出现「差一天」。</li>
+                    </ol>
+
+                    <h3 id="s3-1">① 孩子端「今日」右上角：已完成 x / y</h3>
+                    <div class="doc-table-wrap">
+                        <table class="doc-table">
+                            <thead><tr><th>显示</th><th>怎么算</th></tr></thead>
+                            <tbody>
+                                <tr><td><code>y</code></td><td>今天<strong>该打卡的任务个数</strong>（进行中 + 周期包含今天）</td></tr>
+                                <tr><td><code>x</code></td><td>这些任务里，今天<strong>已经打过卡</strong>的个数</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>例：今天该做 3 个任务，打卡了 2 个 → 右上角显示「已完成 2/3」；全做完会变成绿色的「已完成 3/3」。</p>
+
+                    <h3 id="s3-2">② 连续打卡 N 天（孩子端「记录」「奖励」，家长端「记录」顶部）</h3>
+                    <div class="doc-formula">连续天数 = 从今天往前数，一天接一天有打卡记录的天数
+          · 今天已经打卡 → 从今天开始数
+          · 今天还没打卡 → 从昨天开始数（早上不会显示 0）
+          · 哪天没有打卡记录 → 立刻停</div>
+                    <p>它<strong>不管任务周期</strong>：只要当天完成过任意一个任务，这一天就算「打卡日」。断一天就归零。</p>
+
+                    <h3 id="s3-3">③ 完成率（家长端「📊 记录」页底部）</h3>
+                    <div class="doc-formula">完成率 = round( 实际打卡天数 ÷ 该打卡天数 × 100 )
+实际打卡天数：这个任务的打卡日期，同一天多条只算 1 天    ← 单位是「天」
+该打卡天数  ：从任务创建那天起，按周期逐天数出来       ← 只看任务表</div>
+                    <p>「该打卡天数」数到哪一天，看任务现在的状态：</p>
+                    <div class="doc-table-wrap">
+                        <table class="doc-table">
+                            <thead><tr><th>任务状态</th><th>数到哪天为止</th><th>页面上显示</th></tr></thead>
+                            <tbody>
+                                <tr><td>进行中</td><td>今天</td><td><code>NN%</code> + <code>3/7 天</code></td></tr>
+                                <tr><td>已暂停</td><td><strong>暂停那天</strong>（暂停之后不再加天数）</td><td><code>NN%</code> + 灰标签「已暂停（算到 2026-10-10）」</td></tr>
+                                <tr><td>已结束</td><td><strong>最后一次打卡那天</strong></td><td><code>NN%</code> + 标签「已结束」</td></tr>
+                                <tr><td>已结束、从未打卡</td><td>——</td><td>百分比显示 <code>—</code>，副文字「结束前没有打卡记录」</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p><strong>举个例子</strong>（任务：每周一 / 三 / 五，10-01 创建，只在 10-02、10-05 打了卡）：</p>
+                    <ul>
+                        <li>进行中：该打卡日 = 10-02、10-05、10-07、10-09、10-12、10-14、10-16 → 7 天，完成 2 天 → <strong>29%</strong>。</li>
+                        <li>如果它 10-10 被暂停：分母只剩 4 天 → <strong>50%</strong>（暂停后的日子不再让人「欠账」）。</li>
+                        <li>如果它已结束、最后一次打卡是 10-12：分母 5 天 → 60%。</li>
+                    </ul>
+                    <div class="doc-note doc-note-warn">
+                        注意：系统里没有记录「暂停历史」。所以<strong>暂停之后又去编辑这个任务</strong>，或者<strong>把它恢复成进行中</strong>，
+                        暂停期间的那几天会重新算回分母，百分比会掉下来 —— 这是目前数据结构的限制（要精确得再加一张表，暂时不做）。
+                    </div>
+                </section>
+                <!-- 3 续：日历与小数字 -->
+                <section class="doc-card">
+                    <h3 id="s3-4">④ 日历上的点（家长端「📊 记录」）</h3>
+                    <p>每天的颜色只看两件事：<strong>当天完成了几条</strong> vs <strong>当天有几个「进行中」的任务该打卡</strong>。</p>
+                    <div class="doc-table-wrap">
+                        <table class="doc-table">
+                            <thead><tr><th>颜色</th><th>什么时候出现</th></tr></thead>
+                            <tbody>
+                                <tr><td><span class="doc-dot doc-dot-grey"></span>没有点</td><td>这天一条打卡都没有</td></tr>
+                                <tr><td><span class="doc-dot doc-dot-yellow"></span>黄点</td><td>完成了，但没做完 —— 完成条数 &lt; 当天该打卡的任务个数</td></tr>
+                                <tr><td><span class="doc-dot doc-dot-green"></span>绿点</td><td>全部完成（完成条数 ≥ 当天该打卡的任务个数）</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p>鼠标停在格子上会显示「日期 完成 n 次」；点某一天，下面就会列出那天的打卡明细（照片、文字、星星）——明细里可以删除记录，<strong>删掉后星星会自动扣回</strong>。</p>
+                    <div class="doc-note doc-note-warn">
+                        因为它比的是<strong>任务条数</strong>而不是百分比，所以<strong>事后新增 / 删除 / 暂停任务，会让过去某一天的颜色跟着变</strong>。
+                        例：那天完成了 1 个任务、当时只有 1 个进行中任务 → 是绿点；后来又建了 2 个进行中的任务 → 这天就变黄点了。
+                        这是「用现在的任务清单回看历史」的做法，心里有数就行。
+                    </div>
+
+                    <h3>孩子端的日历不一样</h3>
+                    <p>孩子端只有<strong>绿点 / 没有点</strong>两种：这一天至少有 1 条打卡就亮绿点，不区分完成了几个任务。点日期同样能看当天照片和文字。</p>
+
+                    <h3 id="s3-5">⑤ 家长端「📊 记录」顶部那 4 个数字</h3>
+                    <div class="doc-table-wrap">
+                        <table class="doc-table">
+                            <thead><tr><th>显示</th><th>怎么算</th></tr></thead>
+                            <tbody>
+                                <tr><td>连续打卡（天）</td><td>见上面的 ②（断一天就归零）</td></tr>
+                                <tr><td>累计打卡（天）</td><td>有打卡的日子<strong>去重</strong>后一共几天</td></tr>
+                                <tr><td>累计完成任务（次）</td><td>打卡记录的<strong>条数</strong>（一天做了 3 个任务 = 3 次）</td></tr>
+                                <tr><td>累计获得星星 ⭐</td><td>这些打卡记录各自得了多少星，加起来（<strong>不扣</strong>家长扣星和兑换扣星）</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 id="s3-6">⑥ 星星与勋章</h3>
+                    <div class="doc-formula">星星余额 = 星星流水里每一笔「+n / −n」全部相加</div>
+                    <p>星星什么时候变（每一笔都会留下流水，所以余额永远对得上账）：</p>
+                    <div class="doc-table-wrap">
+                        <table class="doc-table">
+                            <thead><tr><th>什么时候</th><th>星星变化</th></tr></thead>
+                            <tbody>
+                                <tr><td>第一次完成某个任务的打卡</td><td>+ 该任务的星星数（同一天重复提交不会重复给）</td></tr>
+                                <tr><td>家长手动加星 / 扣星</td><td>+n / −n（原因会写进流水）</td></tr>
+                                <tr><td>家长删除一条打卡记录</td><td>− 那条记录给的星星（原因「撤销打卡：任务名」）</td></tr>
+                                <tr><td>家长同意兑换</td><td>− 该奖励需要的星星（原因「兑换：奖励名」）</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p><strong>勋章墙</strong>（孩子端「🎁 奖励」）：用②的连续天数和 7 / 21 / 30 比，达到就点亮 🌟 / 🏅 / 🏆，没点亮会写「还差 N 天」。它是现场算的，删掉打卡勋章会立刻灭掉。</p>
+
+                    <h3 id="s3-7">⑦ 消息红点、兑换状态</h3>
+                    <ul>
+                        <li><strong>红点</strong>：家长发过留言、孩子还没打开「消息」页 → 页签上的小圆点亮起。孩子打开这一页，看完全部留言后自动标记已读，红点消失（页面每 60 秒自动查一次有没有新留言）。</li>
+                        <li><strong>兑换状态</strong>：提交申请后是「等待家长审核」；家长同意 → 「已通过 🎉」并扣星；家长驳回 → 「被驳回」，星星不动。同一个奖励有「待审核」时不能再申请。</li>
+                        <li><strong>家长端「待审核 N」</strong> = 所有还没审核的兑换申请条数。</li>
+                    </ul>
+                </section>
+                <!-- 4 -->
+                <section class="doc-card" id="s4">
+                    <h2>4. 数据存在哪张表（速查）</h2>
+                    <div class="doc-table-wrap">
+                        <table class="doc-table">
+                            <thead><tr><th>表</th><th>存什么</th><th>哪些显示用它</th></tr></thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>tasks</code></td>
+                                    <td>任务：名称、周期（每天 / 每周几）、截止时间、打卡形式、几颗星、状态（进行中 / 暂停 / 结束）、创建时间</td>
+                                    <td>任务卡片、孩子端今日列表、日历的「该打卡」、完成率的分母</td>
+                                </tr>
+                                <tr>
+                                    <td><code>task_checkins</code></td>
+                                    <td>打卡记录：哪个任务、哪个孩子、<strong>哪一天</strong>、是否完成、备注、照片地址、得了多少星</td>
+                                    <td>日历的点、连续天数、完成率分子、4 个概览数字、CSV</td>
+                                </tr>
+                                <tr>
+                                    <td><code>star_records</code></td>
+                                    <td>星星流水：+n / −n、原因、类型（打卡自动 / 家长加 / 扣 / 兑换）、时间</td>
+                                    <td>星星余额、星星流水列表</td>
+                                </tr>
+                                <tr>
+                                    <td><code>rewards</code></td>
+                                    <td>奖励池：名称、说明、需要几颗星、图标、是否上架</td>
+                                    <td>奖励商店、家长端奖励池</td>
+                                </tr>
+                                <tr>
+                                    <td><code>reward_redemptions</code></td>
+                                    <td>兑换申请：谁、兑换什么、花几颗星、状态（待审核 / 已通过 / 已驳回）、审核备注</td>
+                                    <td>「我的兑换申请」、家长端审核卡</td>
+                                </tr>
+                                <tr>
+                                    <td><code>messages</code></td>
+                                    <td>家长留言：谁发给谁、内容、是否已读、时间</td>
+                                    <td>消息列表、红点、家长端留言历史</td>
+                                </tr>
+                                <tr>
+                                    <td><code>members</code></td>
+                                    <td>成员资料：昵称、头像</td>
+                                    <td>顶栏昵称头像、家长端孩子下拉框</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3" style="text-align:center;background:#f9fbff;">📷 打卡照片存在 Supabase 的 Storage 桶 <code>checkin-media</code> 里，数据库只存一个链接</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="doc-muted">统计数字（连续天数、完成率、日历颜色、勋章、余额）都是<strong>打开页面时现算的</strong>，数据库里没有存这些统计结果，所以改一条打卡记录，所有数字会立刻跟着变。</p>
+                </section>
+
+                <!-- 5 -->
+                <section class="doc-card" id="s5">
+                    <h2>5. 常见问题</h2>
+                    <div class="doc-table-wrap">
+                        <table class="doc-table">
+                            <thead><tr><th>问题</th><th>答案</th></tr></thead>
+                            <tbody>
+                                <tr><td>孩子看不到某个任务？</td><td>① 任务不是「进行中」；② 是「每周」任务但一天都没勾；③ 今天不是勾选的那几天</td></tr>
+                                <tr><td>一天能重复打卡吗？</td><td>同一个任务一天只有一条记录。再点「我要打卡 / 重新记录」是<strong>覆盖</strong>当天那条，不会重复给星星</td></tr>
+                                <tr><td>孩子打错了怎么改？</td><td>孩子可以自己重新记录；家长可以到「📊 记录」点那一天 → 「删除」，星星会自动扣回</td></tr>
+                                <tr><td>星星数好像不对？</td><td>看「🎁 奖励」页的星星流水，每一笔都写了原因；余额就是这些数字相加</td></tr>
+                                <tr><td>完成率和自己算的不一样？</td><td>分母是「按当前周期从创建日回算到今天」，暂停 / 结束 / 改周期都会影响（见 ③）</td></tr>
+                                <tr><td>过去的日历颜色变了？</td><td>正常：颜色比的是「当天完成条数 vs 现在进行中的任务数」（见 ④）</td></tr>
+                                <tr><td>想停掉一个任务但保留历史</td><td>用「暂停」或「结束」，<strong>别删</strong>：删任务会连同它的打卡记录一起删掉</td></tr>
+                                <tr><td>忘记密码 / 想加第二个孩子</td><td>去 Supabase 控制台：Users 里 <code>Reset Password</code>，或 <code>Add user</code> 再建一个（孩子账号不用填角色）</td></tr>
+                                <tr><td>怎么改自己的昵称 / 头像？</td><td>点右上角自己的<strong>昵称</strong>（头像旁边那个）→ 弹窗顶部会显示<strong>你现在用的昵称和头像</strong>，选好新头像、改好名字后点「保存」；直接关掉不会改动</td></tr>
+                                <tr><td>为什么 5 分钟就退出了？</td><td>这是防遗忘的自动登出，没有任何鼠标 / 键盘 / 触屏动作就会计时（见第 2 节）</td></tr>
+                                <tr><td>用手机能用吗？</td><td>可以，页面是响应式的，手机上点「我要打卡」可以直接调相机拍照</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- 6 -->
+                <section class="doc-card" id="s6">
+                    <h2>6. 给维护者（自己改代码时看）</h2>
+                    <ul>
+                        <li><strong>想改数字口径</strong>：统计逻辑都集中在 <code>js/stats.js</code>（纯函数）：连续天数 <code>getOverallStreak()</code>、完成率 <code>getRateRange()</code> + <code>getCompletionRate()</code>、日历 <code>buildMonthMatrix()</code> + <code>isTaskScheduledOn()</code>、勋章 <code>getBadgeStates()</code>。改完可以直接用 node 跑一遍验证。</li>
+                        <li><strong>想加字段</strong>：数据库加列 → 对应 <code>js/xxx-api.js</code> 读写 → <code>admin-ui.js</code> / <code>child-ui.js</code> 渲染 → 更新 <code>task-checkin-system.md</code> 和本页。</li>
+                        <li><strong>新增页面</strong>：顶部时钟用 <code>startClock()</code>，无操作登出用 <code>startIdleLogout()</code>，提示 / 弹窗用 <code>ui-common.js</code>，入口守卫用 <code>requireAuth(['admin'|'user'])</code>。</li>
+                        <li><strong>数据库表结构 / 建表 SQL</strong>：见 <code>task-checkin-system.md</code> 第 4 章（7 张表 + Storage 桶，可重复执行）。</li>
+                        <li><strong>改完记得同步</strong>：更新 MD 的「更新日志」和相关章节，需要时再改这一页。</li>
+                        <li>本地打开请用 <code>http://</code>（VS Code Live Server 或 <code>python -m http.server</code>），<strong>直接双击 html</strong> 会因为浏览器限制 ES Module 而白屏。</li>
+                    </ul>
+                    <p class="doc-muted">最后更新：2026-10-17 · 对应代码版本：完成率「天」口径 + 暂停不算分母 + 删除孤儿文件后的版本</p>
+                </section>
+            </div>
+        </div>
+    </main>
+
+</body>
+</html>

@@ -105,23 +105,14 @@ export async function getUserRole() {
   }
 }
 
-// 检查登录状态
-export async function checkAuth() {
-  const user = await getCurrentUser();
-  return user !== null;
-}
-
 // 检查是否为管理员
 export async function isAdmin() {
   const role = await getUserRole();
   return role === 'admin';
 }
 
-// 检查是否为普通用户
-export async function isUser() {
-  const role = await getUserRole();
-  return role === 'user';
-}
+// 说明：旧的 checkAuth() / isUser() 已随 js/ui.js 一起删除，
+// 页面入口守卫统一用下面的 requireAuth()，不再需要单独的「是否登录 / 是否普通用户」判断。
 
 // 按角色算出该进哪个页面：家长 → admin.html，孩子 → child.html
 export function homePageForRole(role) {

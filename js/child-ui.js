@@ -11,7 +11,9 @@ import { todayKey, buildMonthMatrix, getOverallStreak, getBadgeStates, isTaskSch
 import { startClock } from './clock.js';
 import { startIdleLogout } from './idle-logout.js';
 import {
-  showNotification, escapeHtml, showModal, formatDateTime, formatTimeLabel, setButtonLoading
+  showNotification, escapeHtml, showModal,
+  profilePreviewHtml, bindProfilePreview,
+  formatDateTime, formatTimeLabel, setButtonLoading
 } from './ui-common.js';
 
 // 页面状态
@@ -111,23 +113,30 @@ async function loadMyProfile() {
 }
 
 // 昵称 + 头像设置（首次登录必填，之后随时可改）
+// 弹窗顶部先显示「当前昵称 / 当前头像」，改的时候一眼能对照；改完点保存才生效
 function showProfileDialog({ firstTime = false } = {}) {
+  const current = state.profile || null;
+  const currentAvatar = AVATARS.find((a) => a.key === (current?.avatar_key || 'cat')) || AVATARS[0];
+
   const avatarOptions = AVATARS.map((a) => `
     <label class="avatar-option">
-      <input type="radio" name="avatar_key" value="${a.key}" ${a.key === (state.profile?.avatar_key || 'cat') ? 'checked' : ''}>
+      <input type="radio" name="avatar_key" value="${a.key}" ${a.key === currentAvatar.key ? 'checked' : ''}>
       <span>${a.emoji}<em>${a.label}</em></span>
     </label>
   `).join('');
 
   const html = `
-    <p class="muted" style="margin-bottom:12px;">
-      ${firstTime ? '欢迎第一次登录，先给自己起个名字吧～' : '修改我的昵称和头像'}
-    </p>
+    ${firstTime ? '<p class="muted" style="margin-bottom:12px;">欢迎第一次登录，先给自己起个名字吧～</p>' : ''}
+    ${profilePreviewHtml({
+      nickname: current?.nickname || '',
+      avatar: currentAvatar,
+      tip: firstTime ? '选个喜欢的头像 + 填上名字，点「保存」就好' : '这是你现在用的名字和头像；改完点「保存」才会生效'
+    })}
     <form id="profile-form">
       <div class="form-row">
         <label for="profile-nickname">我的名字</label>
         <input class="input" type="text" id="profile-nickname" maxlength="12" placeholder="例如：小明"
-               value="${escapeHtml(state.profile?.nickname || '')}" required>
+               value="${escapeHtml(current?.nickname || '')}" required>
       </div>
       <div class="form-row">
         <label>选个头像</label>
@@ -141,6 +150,7 @@ function showProfileDialog({ firstTime = false } = {}) {
   `;
 
   const modal = showModal(html, { title: '我的资料' });
+  bindProfilePreview(modal.element, { avatars: AVATARS }); // 改名字 / 换头像时，顶部「当前」预览实时跟着变
 
   modal.element.querySelector('#profile-form').addEventListener('submit', async (e) => {
     e.preventDefault();

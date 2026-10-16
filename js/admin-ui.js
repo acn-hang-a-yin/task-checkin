@@ -7,18 +7,20 @@ import { getCheckinsByUser, deleteCheckin } from './checkin-api.js';
 import { getRewards, createReward, updateReward, deleteReward, getRedemptions, reviewRedemption } from './reward-api.js';
 import { sendMessage, getSentMessages, deleteMessage } from './message-api.js';
 import { getStarBalance, getStarRecords, addStars, deductStars } from './star-api.js';
-import { todayKey, buildMonthMatrix, getOverallStreak, getCompletionRate, isTaskScheduledOn, downloadCsv } from './stats.js';
+import { todayKey, buildMonthMatrix, getOverallStreak, getCompletionRate, getRateRange, isTaskScheduledOn, downloadCsv } from './stats.js';
 import { QUICK_FILL, getMyPresets, saveMyPreset, removeMyPreset } from './presets.js';
 import { startClock } from './clock.js';
 import { startIdleLogout } from './idle-logout.js';
 import {
   showNotification, escapeHtml, showModal, confirmDialog,
+  profilePreviewHtml, bindProfilePreview,
   formatDateTime, formatTimeLabel, setButtonLoading
 } from './ui-common.js';
 
 // 页面状态：所有渲染都以这里的数据为准
 const state = {
   user: null,
+  profile: null, // 我自己的 members 资料（昵称 + 头像），改资料弹窗靠它显示「当前昵称 / 当前头像」
   children: [],
   tasks: [],
   checkins: [],
@@ -52,9 +54,10 @@ export async function initAdminPage() {
   startIdleLogout(); // 5 分钟没有任何操作就自动退出登录（见 js/idle-logout.js）
 
   // 4) 成员资料：没有资料就弹首次登录引导
-  const profile = await getMyProfile();
-  renderHeaderUser(profile);
-  if (!profile) showProfileGuide({ firstTime: true });
+  //    存进 state.profile，之后点昵称改资料时弹窗才能显示「当前昵称 / 当前头像」
+  state.profile = await getMyProfile();
+  renderHeaderUser(state.profile);
+  if (!state.profile) showProfileGuide({ firstTime: true });
 
   // 5) 孩子列表 + 默认打开「任务」页签
   await loadChildren();
@@ -71,7 +74,7 @@ function renderHeaderUser(profile) {
 
   const nickname = profile?.nickname || state.user?.email || '家长';
   el.innerHTML = `<span class="avatar-fallback">${avatarEmoji(profile?.avatar_key)}</span>${escapeHtml(nickname)}`;
-  el.title = state.user?.email || '';
+  el.title = (state.user?.email ? `${state.user.email} · ` : '') + '点一下可以改昵称和头像';
 }
 
 function bindHeader() {
@@ -161,21 +164,29 @@ function warnSilent(what, error) {
 /* ============ 家长资料（首次登录引导） ============ */
 
 function showProfileGuide({ firstTime = false } = {}) {
+  // 当前资料：state.profile 就是页面初始化时读出来的自己（昵称 + 头像）
+  const current = state.profile || null;
+  const currentAvatar = AVATARS.find((a) => a.key === (current?.avatar_key || 'cat')) || AVATARS[0];
+
   const avatarOptions = AVATARS.map((a) => `
     <label class="avatar-option">
-      <input type="radio" name="avatar_key" value="${a.key}" ${a.key === 'cat' ? 'checked' : ''}>
+      <input type="radio" name="avatar_key" value="${a.key}" ${a.key === currentAvatar.key ? 'checked' : ''}>
       <span>${a.emoji}<em>${a.label}</em></span>
     </label>
   `).join('');
 
   const html = `
-    <p class="muted" style="margin-bottom:12px;">
-      ${firstTime ? '第一次登录，先给自己起个名字吧～' : '修改昵称和头像'}
-    </p>
+    ${firstTime ? '<p class="muted" style="margin-bottom:12px;">第一次登录，先给自己起个名字吧～</p>' : ''}
+    ${profilePreviewHtml({
+      nickname: current?.nickname || '',
+      avatar: currentAvatar,
+      tip: firstTime ? '选个头像 + 填个昵称，点「保存」就行' : '这是你现在正在用的资料；改完点「保存」才会生效'
+    })}
     <form id="profile-form">
       <div class="form-row">
         <label for="profile-nickname">昵称</label>
-        <input class="input" type="text" id="profile-nickname" maxlength="12" placeholder="例如：妈妈 / 爸爸" required>
+        <input class="input" type="text" id="profile-nickname" maxlength="12" placeholder="例如：妈妈 / 爸爸"
+               value="${escapeHtml(current?.nickname || '')}" required>
       </div>
       <div class="form-row">
         <label>头像</label>
@@ -189,6 +200,7 @@ function showProfileGuide({ firstTime = false } = {}) {
   `;
 
   const modal = showModal(html, { title: '我的资料' });
+  bindProfilePreview(modal.element, { avatars: AVATARS }); // 改昵称 / 换头像时，顶部「当前」预览实时跟着变
 
   modal.element.querySelector('#profile-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -206,6 +218,7 @@ function showProfileGuide({ firstTime = false } = {}) {
       return;
     }
 
+    state.profile = data; // 记住最新资料，下次打开弹窗显示的就是刚保存的
     showNotification('保存成功', 'success');
     renderHeaderUser(data);
     modal.close();
@@ -800,7 +813,7 @@ function renderRecordDayDetail(dateKey) {
     </div>
 
     <div class="card">
-      <h3>任务完成率（从任务创建算到今天）</h3>
+      <h3>任务完成率（进行中：从创建算到今天 · 已暂停：算到暂停那天 · 已结束：算到最后一次打卡）</h3>
       ${state.tasks.length ? state.tasks.map(renderTaskCompletionRow).join('') : '<p class="empty-text">还没有任务</p>'}
     </div>
   `;
@@ -817,24 +830,33 @@ function renderTaskCompletionRow(task) {
     .filter(Boolean)
     .sort();
 
-  // 已结束的任务：只统计到它最后一次打卡那天，否则「应打卡」会一直算到今天
-  const options = task.status === 'ended' && keys.length ? { toKey: keys[keys.length - 1] } : {};
+  // 统计区间统一交给 stats.js 决定（口径要和日历一致：只算任务「进行中」的那些天）：
+  // - 已结束：算到最后一次打卡那天；一次都没打过卡就整行显示「—」，不再显示会一直变小的 0%
+  // - 已暂停：算到「暂停那一刻」（暂停时 task-api.js 会写 tasks.updated_at），
+  //   暂停之后不再往分母里加天数，所以同一张打卡记录，暂停前后看到的百分比是稳定的
+  // - 进行中：从任务创建日算到今天
+  const range = getRateRange(task, keys);
 
   // isTaskScheduledOn() 对已结束任务一律返回 false（当天该不该打卡），
   // 但这里要看的是「历史完成率」，所以统计时先把它当成进行中的任务
   const target = task.status === 'ended' ? { ...task, status: 'active' } : task;
 
-  const { expected, done, rate } = getCompletionRate(target, keys, options);
+  const { expected, done, rate } = range
+    ? getCompletionRate(target, keys, range)
+    : { expected: 0, done: 0, rate: 0 };
+
+  // 暂停中的任务把「算到哪一天」写出来，家长一眼就知道为什么分母不再长了
+  const pausedNote = task.status === 'paused' && range ? '（算到 ' + range.toKey + '）' : '';
 
   return `
     <div class="stat-line">
       <span>${escapeHtml(task.title)}</span>
       <span class="row">
-        <span class="prog" style="width:120px;"><span style="width:${rate}%;"></span></span>
-        <b>${rate}%</b>
-        <span class="muted">${done}/${expected} 次</span>
+        <span class="prog" style="width:120px;"><span style="width:${range ? rate : 0}%;"></span></span>
+        <b>${range ? `${rate}%` : '—'}</b>
+        <span class="muted">${range ? `${done}/${expected} 天` : '结束前没有打卡记录'}</span>
         ${task.status === 'ended' ? '<span class="tag">已结束</span>' : ''}
-        ${task.status === 'paused' ? '<span class="tag tag-warning">已暂停</span>' : ''}
+        ${task.status === 'paused' ? `<span class="tag tag-warning">已暂停${pausedNote}</span>` : ''}
       </span>
     </div>
   `;

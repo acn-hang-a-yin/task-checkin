@@ -85,41 +85,8 @@ export async function getCheckinsByUser(userId, { from = null, to = null, limit 
   }
 }
 
-// 读取当前登录用户自己的打卡记录
-export async function getUserCheckins() {
-  try {
-    const user = await getCurrentUser();
-    if (!user) throw new Error('用户未登录');
-
-    return getCheckinsByUser(user.id);
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
-
-// 家长端：读取所有用户的打卡记录
-export async function getAllUserCheckins(options = {}) {
-  try {
-    if (!(await isAdmin())) throw new Error('权限不足：只有管理员可以查看所有用户的打卡记录');
-
-    const { from = null, to = null, limit = 800 } = options;
-    const supabase = await getSupabaseClient();
-    let query = supabase
-      .from('task_checkins')
-      .select(CHECKIN_SELECT)
-      .order('checkin_date', { ascending: false })
-      .limit(limit);
-
-    if (from) query = query.gte('checkin_date', from);
-    if (to) query = query.lte('checkin_date', to);
-
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    return { success: true, data: data || [] };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+// 说明：旧版单页面（js/ui.js）用的 getUserCheckins() / getAllUserCheckins() 已随它一起删除。
+// 现在家长端用 getCheckinsByUser()、孩子端用 getCheckinsByDate() 读记录，submitCheckin() 写记录。
 
 /**
  * 提交打卡（勾选 / 照片 / 文字）
@@ -223,66 +190,5 @@ export async function deleteCheckin(checkin) {
   }
 }
 
-// 任务今天是否已经打卡（孩子端「今日」卡片的按钮状态）
-export async function isChecked(taskId) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) return false;
-
-    const supabase = await getSupabaseClient();
-    const { data, error } = await supabase
-      .from('task_checkins')
-      .select('is_checked')
-      .eq('task_id', taskId)
-      .eq('user_id', user.id)
-      .eq('checkin_date', todayKey())
-      .maybeSingle();
-
-    if (error) throw new Error(error.message);
-    return data?.is_checked === true;
-  } catch (error) {
-    console.error('检查打卡状态失败:', error);
-    return false;
-  }
-}
-
-// 打卡 / 取消打卡（按「今天」处理，一条记录一天）
-export async function toggleCheckin(taskId) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) throw new Error('用户未登录');
-
-    const supabase = await getSupabaseClient();
-    const dateKey = todayKey();
-
-    const { data: existing } = await supabase
-      .from('task_checkins')
-      .select('id, is_checked')
-      .eq('task_id', taskId)
-      .eq('user_id', user.id)
-      .eq('checkin_date', dateKey)
-      .maybeSingle();
-
-    if (existing) {
-      const newIsChecked = !existing.is_checked;
-      const { data, error } = await supabase
-        .from('task_checkins')
-        .update({ is_checked: newIsChecked, updated_at: new Date() })
-        .eq('id', existing.id)
-        .select();
-
-      if (error) throw new Error(error.message);
-      return { success: true, data: data[0], action: newIsChecked ? 'checked' : 'unchecked' };
-    }
-
-    const { data, error } = await supabase
-      .from('task_checkins')
-      .insert({ task_id: taskId, user_id: user.id, checkin_date: dateKey, is_checked: true })
-      .select();
-
-    if (error) throw new Error(error.message);
-    return { success: true, data: data[0], action: 'checked' };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-}
+// 说明：旧版单页面的 isChecked() / toggleCheckin()（一次点一下切换打卡）已随 js/ui.js 一起删除。
+// 孩子端「今日」卡片的已完成状态来自 getCheckinsByDate()，打卡统一走 submitCheckin()。

@@ -196,6 +196,58 @@ body {
     background: rgba(102, 126, 234, 0.08);
 }
 
+/* 资料弹窗顶部：当前昵称 + 当前头像 预览 */
+.profile-preview {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    margin-bottom: 16px;
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius);
+    background: #f8f9ff;
+    transition: border-color 0.2s ease;
+}
+
+.profile-preview .avatar-fallback {
+    background: rgba(102, 126, 234, 0.12);
+}
+
+.profile-preview-info {
+    min-width: 0; /* 昵称太长时省略号才会生效 */
+}
+
+.profile-preview-line {
+    font-size: 0.92rem;
+    color: var(--color-text-light);
+    margin-bottom: 2px;
+}
+
+.profile-preview-line b {
+    display: inline-block;
+    max-width: 12em; /* 昵称最多 12 字 */
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+    white-space: nowrap;
+}
+
+.profile-preview-tip {
+    font-size: 0.78rem;
+    color: var(--color-text-light);
+    margin-top: 4px;
+}
+
+/* 改过但还没保存：换成橙色提醒 */
+.profile-preview[data-changed='true'] {
+    border-color: var(--color-warning);
+}
+
+.profile-preview[data-changed='true'] .profile-preview-tip {
+    color: var(--color-warning);
+}
+
 /* ---------- 按钮 ---------- */
 .btn {
     display: inline-flex;

@@ -30,5 +30,5 @@ export function getSupabaseClient() {
   return supabase;
 }
 
-// 兼容性导出（edit-task.html 里是 `import { supabase }`，现在拿到的是客户端本体）
-export { supabase };
+// 说明：以前这里还有一个 `export { supabase }`（给已删除的 edit-task.html 用的兼容导出），
+// 现在所有页面都统一用 `await getSupabaseClient()`，那个兼容导出已经没有引用者了，已删除。

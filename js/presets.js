@@ -39,8 +39,5 @@ export function removeMyPreset(index) {
   return list;
 }
 
-// 清空「我的常用」
-export function clearMyPresets() {
-  localStorage.removeItem(PRESET_KEY);
-  return [];
-}
+// 说明：clearMyPresets()（一键清空「我的常用」）没有任何页面在用，已删除；
+// 家长可以在任务弹窗里逐条点「×」删掉某条常用。
